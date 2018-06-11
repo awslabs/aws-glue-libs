@@ -29,14 +29,11 @@ class Job:
     
     def __init__(self, glue_context):
         self._job = glue_context._jvm.Job
-        self._jsc = glue_context._jsc
+        self._glue_context = glue_context
 
     def init(self, job_name, args = {}):
-        self._job.init(job_name, args)
-        encryption_type = args.get('encryption_type', '')
-        if encryption_type == 'sse-s3':
-            self._jsc.hadoopConfiguration().set('fs.s3.enableServerSideEncryption', 'true')
-          
+        self._job.init(job_name, self._glue_context._glue_scala_context, args)
+
     def isInitialized(self):
         return self._job.isInitialized()
 

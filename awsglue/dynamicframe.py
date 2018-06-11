@@ -12,9 +12,13 @@
 
 import json
 from awsglue.utils import makeOptions, callsite
-from awsglue.gluetypes import _deserialize_json_string
-
+from itertools import imap, ifilter
+from awsglue.gluetypes import _deserialize_json_string, _create_dynamic_record, _revert_to_dict, _serialize_schema
+from awsglue.utils import _call_site, _as_java_list, _as_scala_option, _as_resolve_choiceOption
+from pyspark.rdd import RDD, PipelinedRDD
 from pyspark.sql.dataframe import DataFrame
+from pyspark.serializers import PickleSerializer, BatchedSerializer
+
 
 class ResolveOption(object):
     """
@@ -31,6 +35,7 @@ class ResolveOption(object):
         self.action = action
         self.target = target
 
+
 class DynamicFrame(object):
 
     def __init__(self, jdf, glue_ctx, name=""):
@@ -42,6 +47,16 @@ class DynamicFrame(object):
         self._lazy_rdd = None
         self.name = name
 
+    @property
+    def _rdd(self):
+        if self._lazy_rdd is None:
+            jrdd = self._jdf.javaToPython()
+            self._lazy_rdd = RDD(jrdd, self._sc, BatchedSerializer(PickleSerializer()))
+        return self._lazy_rdd
+
+    def with_frame_schema(self, schema):
+        """ Specify schema so we don't have to compute it """
+        return DynamicFrame(self._jdf.pyWithFrameSchema(_serialize_schema(schema)), self.glue_ctx, self.name)
 
     def schema(self):
         if self._schema is None:
@@ -54,8 +69,52 @@ class DynamicFrame(object):
     def show(self, num_rows = 20):
         self._jdf.show(num_rows)
 
+    def filter(self, f, transformation_ctx = "", info="", stageThreshold=0, totalThreshold=0):
+        def wrap_dict_with_dynamic_records(x):
+                rec = _create_dynamic_record(x["record"])
+                try:
+                    return f(rec)
+                except Exception as E:
+                    if isinstance(E, KeyError) or isinstance(E, ValueError) or isinstance(E, TypeError):
+                        return False
+                    x['isError'] = True
+                    x['errorMessage'] = E.message
+                    return True
+
+        def func(iterator):
+            return ifilter(wrap_dict_with_dynamic_records, iterator)
+        return self.mapPartitions(func)
+
+    def mapPartitions(self, f, preservesPartitioning=True):
+        def func(s, iterator):
+            return f(iterator)
+        return self.mapPartitionsWithIndex(func, preservesPartitioning)
+
+    def map(self, f, transformation_ctx = "", info="", stageThreshold=0, totalThreshold=0):
+        def wrap_dict_with_dynamic_records(x):
+            rec = _create_dynamic_record(x["record"])
+            try:
+                result_record = _revert_to_dict(f(rec))
+                if result_record:
+                    x["record"] = result_record
+                else:
+                    x['isError'] = True
+                    x['errorMessage'] = "User-specified function returned None instead of DynamicRecord"
+                return x
+            except Exception as E:
+                x['isError'] = True
+                x['errorMessage'] = E.message
+                return x
+        def func(_, iterator):
+            return imap(wrap_dict_with_dynamic_records, iterator)
+        return self.mapPartitionsWithIndex(func)
+
+    def mapPartitionsWithIndex(self, f, preservesPartitioning=True):
+        return DynamicFrame(self.glue_ctx._jvm.DynamicFrame.fromPythonRDD(
+            PipelinedRDD(self._rdd, f, preservesPartitioning)._jrdd, self.glue_ctx._ssql_ctx), self.glue_ctx, self.name)
+
     def printSchema(self):
-        print self._jdf.schemaTreeString()
+        print self._jdf.schema().treeString()
 
     def toDF(self, options = None):
         """
@@ -110,7 +169,10 @@ class DynamicFrame(object):
 
         >>>unbox("a.b.c", "csv", separator="|")
         """
-        return DynamicFrame(self._jdf.pyUnbox(path, format, json.dumps(options), transformation_ctx, callsite(), info, long(stageThreshold), long(totalThreshold)), self.glue_ctx, self.name)
+        return DynamicFrame(self._jdf.unbox(path, format, json.dumps(options), transformation_ctx,
+                                            _call_site(self._sc, callsite(), info), long(stageThreshold),
+                                            long(totalThreshold)),
+                            self.glue_ctx, self.name)
 
     def drop_fields(self, paths, transformation_ctx = "", info = "", stageThreshold = 0, totalThreshold = 0):
         """
@@ -124,7 +186,9 @@ class DynamicFrame(object):
         if isinstance(paths, basestring):
             paths = [paths]
 
-        return DynamicFrame(self._jdf.pyDropFields(self.glue_ctx._jvm.PythonUtils.toSeq(paths), transformation_ctx, callsite(), info, long(stageThreshold), long(totalThreshold)), self.glue_ctx, self.name)
+        return DynamicFrame(self._jdf.dropFields(self.glue_ctx._jvm.PythonUtils.toSeq(paths), transformation_ctx,
+                                                 _call_site(self._sc, callsite(), info), long(stageThreshold), long(totalThreshold)),
+                            self.glue_ctx, self.name)
 
     def select_fields(self, paths, transformation_ctx = "", info = "", stageThreshold = 0, totalThreshold = 0):
         """
@@ -138,7 +202,9 @@ class DynamicFrame(object):
         if isinstance(paths, basestring):
             paths = [paths]
 
-        return DynamicFrame(self._jdf.pySelectFields(self.glue_ctx._jvm.PythonUtils.toSeq(paths), transformation_ctx, callsite(), info, long(stageThreshold), long(totalThreshold)), self.glue_ctx, self.name)
+        return DynamicFrame(self._jdf.selectFields(self.glue_ctx._jvm.PythonUtils.toSeq(paths), transformation_ctx,
+                                                   _call_site(self._sc, callsite(), info), long(stageThreshold), long(totalThreshold)),
+                            self.glue_ctx, self.name)
 
     def split_fields(self, paths, name1, name2, transformation_ctx = "", info = "", stageThreshold = 0, totalThreshold = 0):
         """
@@ -155,7 +221,8 @@ class DynamicFrame(object):
         if isinstance(paths, basestring):
             paths = [paths]
 
-        jdfs = self._jdf.pySplitFields(self.glue_ctx._jvm.PythonUtils.toSeq(paths), transformation_ctx, callsite(), info, long(stageThreshold), long(totalThreshold))
+        jdfs = _as_java_list(self._sc, self._jdf.splitFields(self.glue_ctx._jvm.PythonUtils.toSeq(paths), transformation_ctx,
+                                     _call_site(self._sc, callsite(), info), long(stageThreshold), long(totalThreshold)))
         return DynamicFrameCollection({name1 : DynamicFrame(jdfs[0], self.glue_ctx, name1), name2 : DynamicFrame(jdfs[1], self.glue_ctx, name2)}, self.glue_ctx)
 
     def split_rows(self, comparison_dict, name1, name2, transformation_ctx = "", info= "", stageThreshold = 0, totalThreshold = 0):
@@ -184,10 +251,11 @@ class DynamicFrame(object):
                 else:
                     values.append(v)
 
-        jdfs = self._jdf.pySplit(self.glue_ctx._jvm.PythonUtils.toSeq(paths),
-                                 self.glue_ctx._jvm.PythonUtils.toSeq(values),
-                                 self.glue_ctx._jvm.PythonUtils.toSeq(operators),
-                                 transformation_ctx, callsite(), info, long(stageThreshold), long(totalThreshold))
+        jdfs = _as_java_list(self._sc, self._jdf.splitRows(self.glue_ctx._jvm.PythonUtils.toSeq(paths),
+                                                      self.glue_ctx._jvm.PythonUtils.toSeq(values),
+                                                      self.glue_ctx._jvm.PythonUtils.toSeq(operators),
+                                                      transformation_ctx, _call_site(self._sc, callsite(), info),
+                                                      long(stageThreshold), long(totalThreshold)))
         return DynamicFrameCollection({name1 : DynamicFrame(jdfs[0], self.glue_ctx, name1), name2 : DynamicFrame(jdfs[1], self.glue_ctx, name2)}, self.glue_ctx)
 
     def rename_field(self, oldName, newName, transformation_ctx = "", info = "", stageThreshold = 0, totalThreshold = 0):
@@ -200,7 +268,8 @@ class DynamicFrame(object):
           for which the processing needs to error out.
         :return: DynamicFrame
         """
-        return DynamicFrame(self._jdf.pyRenameField(oldName, newName, transformation_ctx, callsite(), info, long(stageThreshold), long(totalThreshold)), self.glue_ctx, self.name)
+        return DynamicFrame(self._jdf.renameField(oldName, newName, transformation_ctx, _call_site(self._sc, callsite(), info),
+                                                  long(stageThreshold), long(totalThreshold)), self.glue_ctx, self.name)
 
     def write(self, connection_type, connection_options={},
               format=None, format_options={}, accumulator_size = 0):
@@ -214,8 +283,11 @@ class DynamicFrame(object):
     def count(self):
         return self._jdf.count()
 
-    def spigot(self, path, options={}):
-        return DynamicFrame(self._jdf.pySpigot(path, makeOptions(self._sc, options)), self.glue_ctx, self.name) 
+    def spigot(self, path, options={}, transformation_ctx = "", info = "", stageThreshold = 0, totalThreshold = 0):
+        return DynamicFrame(self._jdf.spigot(path, makeOptions(self._sc, options), transformation_ctx,
+                                             _call_site(self._sc, callsite(), info), long(stageThreshold),
+                                             long(totalThreshold)),
+                            self.glue_ctx, self.name)
             
     def join(self, paths1, paths2, frame2, transformation_ctx = "", info = "", stageThreshold = 0, totalThreshold = 0):
         if isinstance(paths1, basestring):
@@ -223,7 +295,7 @@ class DynamicFrame(object):
         if isinstance(paths2, basestring):
             paths2 = [paths2]
 
-        return DynamicFrame(self._jdf.pyJoin(self.glue_ctx._jvm.PythonUtils.toSeq(paths1), self.glue_ctx._jvm.PythonUtils.toSeq(paths2), frame2._jdf, transformation_ctx, callsite(), info, long(stageThreshold), long(totalThreshold)), self.glue_ctx, self.name + frame2.name)
+        return DynamicFrame(self._jdf.join(self.glue_ctx._jvm.PythonUtils.toSeq(paths1), self.glue_ctx._jvm.PythonUtils.toSeq(paths2), frame2._jdf, transformation_ctx, _call_site(self._sc, callsite(), info), long(stageThreshold), long(totalThreshold)), self.glue_ctx, self.name + frame2.name)
 
     def unnest(self, transformation_ctx = "", info = "", stageThreshold = 0, totalThreshold = 0):
         """
@@ -237,7 +309,7 @@ class DynamicFrame(object):
 
         >>>unnest()
         """
-        return DynamicFrame(self._jdf.pyUnnest(transformation_ctx, callsite(), info, long(stageThreshold), long(totalThreshold)), self.glue_ctx, self.name)
+        return DynamicFrame(self._jdf.unnest(transformation_ctx, _call_site(self._sc, callsite(), info), long(stageThreshold), long(totalThreshold)), self.glue_ctx, self.name)
 
     def relationalize(self, root_table_name, staging_path, options={}, transformation_ctx = "", info = "", stageThreshold = 0, totalThreshold = 0):
         """
@@ -256,31 +328,52 @@ class DynamicFrame(object):
           for which the processing needs to error out.
         :return: DynamicFrameCollection
         """
-        _rFrames = self._jdf.pyRelationalize(root_table_name, staging_path, makeOptions(self._sc, options), transformation_ctx, callsite(), info, long(stageThreshold), long(totalThreshold))
+        _rFrames = _as_java_list(self._sc, self._jdf.relationalize(root_table_name, staging_path,
+                                                              makeOptions(self._sc, options),
+                                                              transformation_ctx, _call_site(self._sc, callsite(), info),
+                                                              long(stageThreshold), long(totalThreshold)))
         return DynamicFrameCollection(dict((df.getName(), DynamicFrame(df, self.glue_ctx, df.getName())) for df in _rFrames), self.glue_ctx)
 
     def applyMapping(self, *args, **kwargs):
-        return self.apply_mapping(*(args[1:]), **kwargs)
+        # In a previous version we passed args[1:] and in our tests we passed
+        # the DynamicFrame as the first argument. This checks for that case
+        # to avoid regressions.
+        if len(args) > 0 and isinstance(args[0], DynamicFrame):
+            return self.apply_mapping(*(args[1:]), **kwargs)
+        else:
+            return self.apply_mapping(*args, **kwargs)
 
     def apply_mapping(self, mappings, case_sensitive = False, transformation_ctx = "", info = "", stageThreshold = 0, totalThreshold = 0):
         def _to_java_mapping(mapping_tup):
-            source_path, source_type, target_path, target_type = mapping_tup
-            return self.glue_ctx._jvm.MappingSpec.apply(
-                source_path,
-                source_type,
-                target_path,
-                target_type)
+            if not isinstance(mapping_tup, tuple):
+                raise TypeError("Mapping must be specified as a tuple. Got " +
+                                mapping_tup)
+
+            tup2 = self.glue_ctx._jvm.scala.Tuple2
+            tup3 = self.glue_ctx._jvm.scala.Tuple3
+            tup4 = self.glue_ctx._jvm.scala.Tuple4
+            java_cls = self.glue_ctx._jvm.MappingSpec
+
+            if len(mapping_tup) == 2:
+                return java_cls.apply(tup2.apply(mapping_tup[0], mapping_tup[1]))
+            elif len(mapping_tup) == 3:
+                return java_cls.apply(tup3.apply(mapping_tup[0], mapping_tup[1], mapping_tup[2]))
+            elif len(mapping_tup) == 4:
+                return java_cls.apply(tup4.apply(mapping_tup[0], mapping_tup[1], mapping_tup[2], mapping_tup[3]))
+            else:
+                raise ValueError("Mapping tuple must be of length 2, 3, or 4"
+                                 "Got tuple of length " + len(mapping_tup))
 
         if isinstance(mappings, tuple):
             mappings = [mappings]
 
         mappings_list = [ _to_java_mapping(m) for m in mappings ]
 
-        new_jdf = self._jdf.pyApplyMapping(
+        new_jdf = self._jdf.applyMapping(
             self.glue_ctx._jvm.PythonUtils.toSeq(mappings_list),
             case_sensitive,
             transformation_ctx,
-            callsite(), info, long(stageThreshold), long(totalThreshold))
+            _call_site(self._sc, callsite(), info), long(stageThreshold), long(totalThreshold))
 
         return DynamicFrame(new_jdf, self.glue_ctx, self.name)
 
@@ -313,11 +406,15 @@ class DynamicFrame(object):
 
         specs_list = [ _to_java_specs(m) for m in specs ]
 
-        new_jdf = self._jdf.pyResolveChoice(
+        choice_option = _as_scala_option(self._sc, _as_resolve_choiceOption(self._sc, choice))
+        database_option = _as_scala_option(self._sc, database)
+        table_name_option = _as_scala_option(self._sc, table_name)
+
+        new_jdf = self._jdf.resolveChoice(
             self.glue_ctx._jvm.PythonUtils.toSeq(specs_list),
-            choice, database, table_name,
+            choice_option, database_option, table_name_option,
             transformation_ctx,
-            callsite(), info, long(stageThreshold), long(totalThreshold))
+            _call_site(self._sc, callsite(), info), long(stageThreshold), long(totalThreshold))
 
         return DynamicFrame(new_jdf, self.glue_ctx, self.name)
 
@@ -434,15 +531,15 @@ class DynamicFrameReader(object):
         return self._glue_context.create_dynamic_frame_from_rdd(data, name, schema, sampleRatio)
 
     def from_options(self, connection_type, connection_options={},
-                     format=None, format_options={}, transformation_ctx="", **kwargs):
+                     format=None, format_options={}, transformation_ctx="", push_down_predicate = "", **kwargs):
         """Creates a DynamicFrame with the specified connection and format.
         """
         return self._glue_context.create_dynamic_frame_from_options(connection_type,
                                                                     connection_options,
                                                                     format,
-                                                                    format_options, transformation_ctx, **kwargs)
+                                                                    format_options, transformation_ctx, push_down_predicate, **kwargs)
 
-    def from_catalog(self, database = None, table_name = None, redshift_tmp_dir = "", transformation_ctx = "", **kwargs):
+    def from_catalog(self, database = None, table_name = None, redshift_tmp_dir = "", transformation_ctx = "", push_down_predicate = "", additional_options = {}, **kwargs):
         """Creates a DynamicFrame with the specified catalog name space and table name.
         """
         if database is not None and "name_space" in kwargs:
@@ -457,7 +554,7 @@ class DynamicFrameReader(object):
         if table_name is None:
             raise Exception("Parameter table_name is missing.")
 
-        return self._glue_context.create_dynamic_frame_from_catalog(db, table_name, redshift_tmp_dir, transformation_ctx, **kwargs)
+        return self._glue_context.create_dynamic_frame_from_catalog(db, table_name, redshift_tmp_dir, transformation_ctx, push_down_predicate, additional_options, **kwargs)
 
 
 class DynamicFrameWriter(object):
@@ -474,7 +571,7 @@ class DynamicFrameWriter(object):
                                                                  format,
                                                                  format_options, transformation_ctx)
 
-    def from_catalog(self, frame, database = None, table_name = None, redshift_tmp_dir = "", transformation_ctx = "", **kwargs):
+    def from_catalog(self, frame, database = None, table_name = None, redshift_tmp_dir = "", transformation_ctx = "", additional_options = {}, **kwargs):
         """Creates a DynamicFrame with the specified catalog name space and table name.
         """
         if database is not None and "name_space" in kwargs:
@@ -489,7 +586,7 @@ class DynamicFrameWriter(object):
         if table_name is None:
             raise Exception("Parameter table_name is missing.")
 
-        return self._glue_context.write_dynamic_frame_from_catalog(frame, db, table_name, redshift_tmp_dir, transformation_ctx)
+        return self._glue_context.write_dynamic_frame_from_catalog(frame, db, table_name, redshift_tmp_dir, transformation_ctx, additional_options)
 
     def from_jdbc_conf(self, frame, catalog_connection, connection_options={}, redshift_tmp_dir = "", transformation_ctx=""):
         """Creates a DynamicFrame with the specified JDBC connection information.

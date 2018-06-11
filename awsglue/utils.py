@@ -28,12 +28,40 @@ def makeOptions(sc, py_obj):
                         + " in makeOptions")
     return sc._jvm.JsonOptions(json_string)
 
+
+def _call_site(sc, call_site, info):
+    return sc._jvm.CallSite(call_site, info)
+
+
+def _as_java_list(sc, scala_seq_obj):
+    return sc._jvm.GluePythonUtils.seqAsJava(scala_seq_obj)
+
+
+def _as_scala_option(sc, some_val):
+    return sc._jvm.GluePythonUtils.constructOption(some_val)
+
+
+def _as_resolve_choiceOption(sc, choice_option_str):
+    return sc._jvm.GluePythonUtils.constructChoiceOption(choice_option_str)
+
+
 def callsite():
     return "".join(traceback.format_list(traceback.extract_stack()[:-2]))
 
 
+class GlueArgumentError(Exception):
+    pass
+
+
+# Define a custom argument parser that raises an exception rather than calling
+# sys.exit() so that we can surface the errors.
+class GlueArgumentParser(argparse.ArgumentParser):
+    def error(self, msg):
+        raise GlueArgumentError(msg)
+
+
 def getResolvedOptions(args, options):
-    parser = argparse.ArgumentParser()
+    parser = GlueArgumentParser()
 
     if Job.continuation_options()[0][2:] in options:
         raise RuntimeError("Using reserved arguments " + Job.continuation_options()[0][2:])
@@ -91,7 +119,5 @@ def getResolvedOptions(args, options):
         parsed_dict['job_bookmark_option'] = bookmark_value
 
     _global_args.update(parsed_dict)
-
-    print 'Found extra arguments', extra
 
     return parsed_dict

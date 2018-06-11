@@ -12,7 +12,6 @@
 
 import json
 
-
 class DataType(object):
     def __init__(self, properties={}):
         self.properties = properties
@@ -30,6 +29,7 @@ class DataType(object):
 
     def jsonValue(self):
         return {"dataType": self.typeName(), "properties": self.properties}
+
 
 
 # ---------------------------------------------------------------------------
@@ -154,6 +154,27 @@ class ArrayType(DataType):
 
     def jsonValue(self):
         return dict(super(ArrayType, self).jsonValue().items() +
+                    [("elementType", self.elementType.jsonValue())])
+
+    @classmethod
+    def fromJsonValue(cls, json_value):
+        element_type = _deserialize_json_value(json_value["elementType"])
+        return cls(elementType=element_type,
+                   properties=json_value.get('properties', {}))
+
+class SetType(DataType):
+
+    def __init__(self, elementType=UnknownType(), properties={}):
+        assert isinstance(elementType, DataType), \
+            "elementType should be DataType. Got" + str(elementType.__class__)
+        super(SetType, self).__init__(properties)
+        self.elementType = elementType
+
+    def __repr__(self):
+        return "SetType({}, {})".format(self.elementType, self.properties)
+
+    def jsonValue(self):
+        return dict(super(SetType, self).jsonValue().items() +
                     [("elementType", self.elementType.jsonValue())])
 
     @classmethod
@@ -308,7 +329,7 @@ _atomic_types = [BinaryType, BooleanType, ByteType, DateType, DecimalType,
                  ShortType, StringType, TimestampType, UnknownType]
 
 
-_complex_types = [ArrayType, ChoiceType, MapType, StructType]
+_complex_types = [ArrayType, ChoiceType, MapType, StructType, SetType]
 
 
 _atomic_type_map = dict((t.typeName(), t) for t in _atomic_types)
@@ -329,6 +350,8 @@ def _deserialize_json_value(json_val):
     data_type = json_val["dataType"]
     return _all_type_map[data_type].fromJsonValue(json_val)
 
+def _serialize_schema(schema):
+    return json.dumps(schema.jsonValue())
 
 def _make_choice(s1, s2):
     if isinstance(s1, ChoiceType):
@@ -393,3 +416,30 @@ def mergeDataTypes(s1, s2):
             return EnumType(s1.options + s2.options)
         else:
             return s1
+
+
+def _create_dynamic_record(dynamicRecord):
+    vals = dict()
+    for k, v in dynamicRecord.items():
+        val = v
+        if type(v) == dict:
+            val = DynamicRecord(v)
+        vals[k] = val
+    return DynamicRecord(vals)
+
+
+def _revert_to_dict(dynamicRecord):
+    if isinstance(dynamicRecord, dict):
+        return {k: _revert_to_dict(v) for k,v in dynamicRecord.iteritems()}
+    elif isinstance(dynamicRecord, list):
+        return [_revert_to_dict(v) for v in dynamicRecord]
+    else:
+        return dynamicRecord
+
+class DynamicRecord(dict):
+    def __getattr__(self, attr):
+        return self[attr]
+
+    def __setattr__(self, attr, value):
+        self[attr] = value
+

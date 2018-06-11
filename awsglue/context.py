@@ -16,6 +16,7 @@ from py4j.java_gateway import java_import
 from awsglue.data_source import DataSource
 from awsglue.data_sink import DataSink
 from awsglue.dynamicframe import DynamicFrame, DynamicFrameReader, DynamicFrameWriter, DynamicFrameCollection
+from awsglue.gluetypes import DataType
 from awsglue.utils import makeOptions, callsite
 import pyspark
 import os
@@ -26,12 +27,12 @@ from py4j.java_gateway import JavaClass
 def register(sc):
     java_import(sc._jvm, "com.amazonaws.services.glue.*")
     java_import(sc._jvm, "com.amazonaws.services.glue.schema.*")
-    java_import(sc._jvm, "org.apache.spark.sql.glue.GlueContext")
     java_import(sc._jvm, "com.amazonaws.services.glue.util.JsonOptions")
     java_import(sc._jvm, "org.apache.spark.sql.glue.util.SparkUtility")
-    java_import(sc._jvm, 'org.apache.spark.sql.glue.gluefunctions')
     java_import(sc._jvm, "com.amazonaws.services.glue.util.Job")
     java_import(sc._jvm, "com.amazonaws.services.glue.util.AWSConnectionUtils")
+    java_import(sc._jvm, "com.amazonaws.services.glue.util.GluePythonUtils")
+    java_import(sc._jvm, "com.amazonaws.services.glue.errors.CallSite")
 
 
 class GlueContext(SQLContext):
@@ -64,7 +65,7 @@ class GlueContext(SQLContext):
         else:
             return self._jvm.GlueContext(self._jsc.sc(), min_partitions, target_partitions)
 
-    def getSource(self, connection_type, format = None, transformation_ctx = "", **options):
+    def getSource(self, connection_type, format = None, transformation_ctx = "", push_down_predicate= "", **options):
         """Creates a DataSource object.
 
         This can be used to read DynamicFrames from external sources.
@@ -79,7 +80,7 @@ class GlueContext(SQLContext):
             connection_type = format
 
         j_source = self._ssql_ctx.getSource(connection_type,
-                                            makeOptions(self._sc, options), transformation_ctx)
+                                            makeOptions(self._sc, options), transformation_ctx, push_down_predicate)
 
         prefix = None
         if 'paths' in options and options['paths'] != None:
@@ -102,8 +103,17 @@ class GlueContext(SQLContext):
         df = super(GlueContext, self).createDataFrame(data, schema, sample_ratio)
         return DynamicFrame.fromDF(df, self, name)
 
-    def create_dynamic_frame_from_catalog(self, database = None, table_name = None, redshift_tmp_dir = "", transformation_ctx = "", **kwargs):
-        """Creates a DynamicFrame with catalog database and table name
+    def create_dynamic_frame_from_catalog(self, database = None, table_name = None, redshift_tmp_dir = "",
+                                          transformation_ctx = "", push_down_predicate="", additional_options = {}, **kwargs):
+        """
+        Creates a DynamicFrame with catalog database and table name
+        :param database: database in catalog
+        :param table_name: table name
+        :param redshift_tmp_dir: tmp dir
+        :param transformation_ctx: transformation context
+        :param push_down_predicate
+        :param additional_options
+        :return: dynamic frame with potential errors
         """
         if database is not None and "name_space" in kwargs:
             raise Exception("Parameter name_space and database are both specified, choose one.")
@@ -116,11 +126,14 @@ class GlueContext(SQLContext):
 
         if table_name is None:
             raise Exception("Parameter table_name is missing.")
-        source = DataSource(self._ssql_ctx.getCatalogSource(db, table_name, redshift_tmp_dir, transformation_ctx), self, table_name)
+        source = DataSource(self._ssql_ctx.getCatalogSource(db, table_name, redshift_tmp_dir, transformation_ctx,
+                                                            push_down_predicate,
+                                                            makeOptions(self._sc, additional_options)),
+                            self, table_name)
         return source.getFrame(**kwargs)
 
     def create_dynamic_frame_from_options(self, connection_type, connection_options={},
-                                          format=None, format_options={}, transformation_ctx = "", **kwargs):
+                                          format=None, format_options={}, transformation_ctx = "", push_down_predicate= "",  **kwargs):
         """Creates a DynamicFrame with the specified connection and format.
 
         Example:
@@ -129,7 +142,7 @@ class GlueContext(SQLContext):
         >>>                                      format="json")
 
         """
-        source = self.getSource(connection_type, format, transformation_ctx, **connection_options)
+        source = self.getSource(connection_type, format, transformation_ctx, push_down_predicate, **connection_options)
 
         if (format and format not in self.Spark_SQL_Formats):
             source.setFormat(format, **format_options)
@@ -199,14 +212,16 @@ class GlueContext(SQLContext):
 
     # Note that since the table name is included in the catalog specification,
     # it doesn't make sense to include a version of this method for DFCs.
-    def write_dynamic_frame_from_catalog(self, frame, database = None, table_name = None, redshift_tmp_dir = "", transformation_ctx = "", **kwargs):
+    def write_dynamic_frame_from_catalog(self, frame, database = None, table_name = None, redshift_tmp_dir = "",
+                                         transformation_ctx = "", additional_options = {}, **kwargs):
         """
-        Creates a DynamicFrame with catalog database and table name
+        Writes a DynamicFrame to a location defined in the catalog's database and table name
         :param frame: dynamic frame to be written
         :param database: database in catalog
         :param table_name: table name
         :param redshift_tmp_dir: tmp dir
         :param transformation_ctx: transformation context
+        :param additional_options
         :return: dynamic frame with potential errors
         """
 
@@ -222,20 +237,24 @@ class GlueContext(SQLContext):
         if table_name is None:
             raise Exception("Parameter table_name is missing.")
 
-        j_sink = self._ssql_ctx.getCatalogSink(db, table_name, redshift_tmp_dir)
+        j_sink = self._ssql_ctx.getCatalogSink(db, table_name, redshift_tmp_dir, transformation_ctx,
+                                               makeOptions(self._sc, additional_options))
         return DataSink(j_sink, self).write(frame)
 
-    def write_dynamic_frame_from_jdbc_conf(self, frame, catalog_connection, connection_options={}, redshift_tmp_dir = "", transformation_ctx = ""):
+    def write_dynamic_frame_from_jdbc_conf(self, frame, catalog_connection, connection_options={},
+                                           redshift_tmp_dir = "", transformation_ctx = ""):
         """
         :param frame: dynamic frame to be written
         :param catalog_connection: catalog connection name, used to access JDBC configuration
-        :param connection_type: redshift, mysql, postgres or aurora
         :param connection_options: dbtable and so on
+        :param redshift_tmp_dir: tmp dir
+        :param transformation_ctx: transformation context
         :return: dynamic frame with potential errors
         """
         self.write_from_jdbc_conf(frame, catalog_connection, connection_options, redshift_tmp_dir, transformation_ctx)
 
-    def write_from_jdbc_conf(self, frame_or_dfc, catalog_connection, connection_options={}, redshift_tmp_dir = "", transformation_ctx = ""):
+    def write_from_jdbc_conf(self, frame_or_dfc, catalog_connection, connection_options={},
+                             redshift_tmp_dir = "", transformation_ctx = ""):
         if isinstance(frame_or_dfc, DynamicFrameCollection):
             new_options = dict(connection_options.items()
                                + [("useFrameName", True)])
@@ -246,14 +265,27 @@ class GlueContext(SQLContext):
                             "DynamicFrameCollection. Got " +
                             str(type(frame_or_dfc)))
 
-        j_sink = self._ssql_ctx.getJDBCSink(catalog_connection, makeOptions(self._sc, new_options), redshift_tmp_dir)
+        j_sink = self._ssql_ctx.getJDBCSink(catalog_connection, makeOptions(self._sc, new_options), redshift_tmp_dir,
+                                            transformation_ctx)
         return DataSink(j_sink, self).write(frame_or_dfc)
 
     def convert_resolve_option(self, path, action, target):
-        if target is None:
-            return self._jvm.ResolveOption(path, action)
+
+        if action.upper() == "KEEPASSTRUCT":
+            return self._jvm.ResolveSpec.apply(path, "make_struct")
+        elif action.upper() == "PROJECT":
+            if target is None or not isinstance(target, DataType):
+                raise ValueError("Target type must be specified with project action.")
+
+            return self._jvm.ResolveSpec.apply(path, "project:{}".format(target.typeName()))
         else:
-            return self._jvm.ResolveOption(path, action, self._ssql_ctx.parseDataType(target.json()))
+            raise ValueError("Invalid resolve action {}. ".format(action) +
+                             "Action must be one of KeepAsStruct and Project.")
 
     def extract_jdbc_conf(self, connection_name):
+        """
+        Get the username, password, vendor and url from the connection object in the catalog
+        :param connection_name: name of the connection in the catalog
+        :return: dict with keys "user", "password", "vendor", "url"
+        """
         return self._ssql_ctx.extractJDBCConf(connection_name)
