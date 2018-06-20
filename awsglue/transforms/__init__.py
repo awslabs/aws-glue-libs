@@ -14,17 +14,19 @@ from transform import GlueTransform
 from unbox import Unbox
 from unnest_frame import UnnestFrame
 from relationalize import Relationalize
-from field_transforms import RenameField, DropFields, SelectFields, SplitFields, SplitRows, Join
+from field_transforms import RenameField, DropFields, SelectFields, SplitFields, SplitRows, Join, Spigot
 from collection_transforms import SelectFromCollection, MapToCollection, FlatMap
 from drop_nulls import DropNullFields
 from apply_mapping import ApplyMapping
 from resolve_choice import ResolveChoice
 from errors_as_dynamicframe import ErrorsAsDynamicFrame
+from dynamicframe_filter import Filter
+from dynamicframe_map import Map
 import json
 
 ALL_TRANSFORMS = {Unbox, RenameField, DropFields, SplitFields, SelectFields, SplitRows,
                   UnnestFrame, Relationalize, SelectFromCollection,
-                  MapToCollection, ErrorsAsDynamicFrame, FlatMap, DropNullFields, Join, ApplyMapping, ResolveChoice}
+                  MapToCollection, ErrorsAsDynamicFrame, FlatMap, DropNullFields, Join, ApplyMapping, ResolveChoice, Spigot, Filter, Map}
 
 __all__ = [transform.__name__ for transform in ALL_TRANSFORMS]
 
