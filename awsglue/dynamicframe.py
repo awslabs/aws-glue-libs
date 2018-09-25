@@ -362,7 +362,7 @@ class DynamicFrame(object):
                 return java_cls.apply(tup4.apply(mapping_tup[0], mapping_tup[1], mapping_tup[2], mapping_tup[3]))
             else:
                 raise ValueError("Mapping tuple must be of length 2, 3, or 4"
-                                 "Got tuple of length " + len(mapping_tup))
+                                 "Got tuple of length " + str(len(mapping_tup)))
 
         if isinstance(mappings, tuple):
             mappings = [mappings]
