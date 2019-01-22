@@ -14,8 +14,8 @@ from transform import GlueTransform
 
 
 class Map(GlueTransform):
-    def __call__(self, frame, f, transformation_ctx = "", info="", stageThreshold=0, totalThreshold=0):
-        return frame.map(f, transformation_ctx, info, stageThreshold, totalThreshold)
+    def __call__(self, frame, f, preservesPartitioning = False,transformation_ctx = "", info="", stageThreshold=0, totalThreshold=0):
+        return frame.map(f, preservesPartitioning, transformation_ctx, info, stageThreshold, totalThreshold)
 
     @classmethod
     def describeArgs(cls):
@@ -29,28 +29,33 @@ class Map(GlueTransform):
                 "description": "Function to apply on records in the DynamicFrame. The function takes a DynamicRecord as an argument and returns a DynamicRecord",
                 "optional": False,
                 "defaultValue": None}
-        arg3 = {"name": "transformation_ctx",
+        arg3 = {"name": "preservesPartitioning",
+                "type": "Boolean",
+                "description": "Whether to preserve the partitioning in the DynamicFrame.",
+                "optional": True,
+                "defaultValue": False}
+        arg4 = {"name": "transformation_ctx",
                 "type": "String",
                 "description": "A unique string that is used to identify stats / state information",
                 "optional": True,
                 "defaultValue": ""}
-        arg4 = {"name": "info",
+        arg5 = {"name": "info",
                 "type": "String",
                 "description": "Any string to be associated with errors in the transformation",
                 "optional": True,
                 "defaultValue": "\"\""}
-        arg5 = {"name": "stageThreshold",
+        arg6 = {"name": "stageThreshold",
                 "type": "Integer",
                 "description": "Max number of errors in the transformation until processing will error out",
                 "optional": True,
                 "defaultValue": "0"}
-        arg6 = {"name": "totalThreshold",
+        arg7 = {"name": "totalThreshold",
                 "type": "Integer",
                 "description": "Max number of errors total until processing will error out.",
                 "optional": True,
                 "defaultValue": "0"}
 
-        return [arg1, arg2, arg3, arg4, arg5, arg6]
+        return [arg1, arg2, arg3, arg4, arg5, arg6, arg7]
 
 
     @classmethod

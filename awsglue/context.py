@@ -104,15 +104,18 @@ class GlueContext(SQLContext):
         return DynamicFrame.fromDF(df, self, name)
 
     def create_dynamic_frame_from_catalog(self, database = None, table_name = None, redshift_tmp_dir = "",
-                                          transformation_ctx = "", push_down_predicate="", additional_options = {}, **kwargs):
+                                          transformation_ctx = "", push_down_predicate="", additional_options = {},
+                                          catalog_id = None, **kwargs):
         """
-        Creates a DynamicFrame with catalog database and table name
+        Creates a DynamicFrame with catalog database, table name and an optional catalog id
         :param database: database in catalog
         :param table_name: table name
         :param redshift_tmp_dir: tmp dir
         :param transformation_ctx: transformation context
         :param push_down_predicate
         :param additional_options
+        :param catalog_id catalog id of the DataCatalog being accessed (account id of the data catalog).
+                Set to None by default (None defaults to the catalog id of the calling account in the service)
         :return: dynamic frame with potential errors
         """
         if database is not None and "name_space" in kwargs:
@@ -128,7 +131,7 @@ class GlueContext(SQLContext):
             raise Exception("Parameter table_name is missing.")
         source = DataSource(self._ssql_ctx.getCatalogSource(db, table_name, redshift_tmp_dir, transformation_ctx,
                                                             push_down_predicate,
-                                                            makeOptions(self._sc, additional_options)),
+                                                            makeOptions(self._sc, additional_options), catalog_id),
                             self, table_name)
         return source.getFrame(**kwargs)
 
@@ -213,15 +216,17 @@ class GlueContext(SQLContext):
     # Note that since the table name is included in the catalog specification,
     # it doesn't make sense to include a version of this method for DFCs.
     def write_dynamic_frame_from_catalog(self, frame, database = None, table_name = None, redshift_tmp_dir = "",
-                                         transformation_ctx = "", additional_options = {}, **kwargs):
+                                         transformation_ctx = "", additional_options = {}, catalog_id = None, **kwargs):
         """
-        Writes a DynamicFrame to a location defined in the catalog's database and table name
+        Writes a DynamicFrame to a location defined in the catalog's database, table name and an optional catalog id
         :param frame: dynamic frame to be written
         :param database: database in catalog
         :param table_name: table name
         :param redshift_tmp_dir: tmp dir
         :param transformation_ctx: transformation context
         :param additional_options
+        :param catalog_id catalog_id catalog id of the DataCatalog being accessed (account id of the data catalog).
+                Set to None by default (None defaults to the catalog id of the calling account in the service)
         :return: dynamic frame with potential errors
         """
 
@@ -238,23 +243,26 @@ class GlueContext(SQLContext):
             raise Exception("Parameter table_name is missing.")
 
         j_sink = self._ssql_ctx.getCatalogSink(db, table_name, redshift_tmp_dir, transformation_ctx,
-                                               makeOptions(self._sc, additional_options))
+                                               makeOptions(self._sc, additional_options), catalog_id)
         return DataSink(j_sink, self).write(frame)
 
     def write_dynamic_frame_from_jdbc_conf(self, frame, catalog_connection, connection_options={},
-                                           redshift_tmp_dir = "", transformation_ctx = ""):
+                                           redshift_tmp_dir = "", transformation_ctx = "", catalog_id = None):
         """
         :param frame: dynamic frame to be written
         :param catalog_connection: catalog connection name, used to access JDBC configuration
         :param connection_options: dbtable and so on
         :param redshift_tmp_dir: tmp dir
         :param transformation_ctx: transformation context
+        :param catalog_id catalog id of the DataCatalog being accessed (account id of the data catalog).
+                Set to None by default (None defaults to the catalog id of the calling account in the service)
         :return: dynamic frame with potential errors
         """
-        self.write_from_jdbc_conf(frame, catalog_connection, connection_options, redshift_tmp_dir, transformation_ctx)
+        self.write_from_jdbc_conf(frame, catalog_connection, connection_options, redshift_tmp_dir, transformation_ctx,
+                                  catalog_id)
 
     def write_from_jdbc_conf(self, frame_or_dfc, catalog_connection, connection_options={},
-                             redshift_tmp_dir = "", transformation_ctx = ""):
+                             redshift_tmp_dir = "", transformation_ctx = "", catalog_id = None):
         if isinstance(frame_or_dfc, DynamicFrameCollection):
             new_options = dict(connection_options.items()
                                + [("useFrameName", True)])
@@ -266,7 +274,7 @@ class GlueContext(SQLContext):
                             str(type(frame_or_dfc)))
 
         j_sink = self._ssql_ctx.getJDBCSink(catalog_connection, makeOptions(self._sc, new_options), redshift_tmp_dir,
-                                            transformation_ctx)
+                                            transformation_ctx, catalog_id)
         return DataSink(j_sink, self).write(frame_or_dfc)
 
     def convert_resolve_option(self, path, action, target):
@@ -282,10 +290,12 @@ class GlueContext(SQLContext):
             raise ValueError("Invalid resolve action {}. ".format(action) +
                              "Action must be one of KeepAsStruct and Project.")
 
-    def extract_jdbc_conf(self, connection_name):
+    def extract_jdbc_conf(self, connection_name, catalog_id=None):
         """
         Get the username, password, vendor and url from the connection object in the catalog
         :param connection_name: name of the connection in the catalog
+        :param catalog_id: catalog id of the DataCatalog being accessed (account id of the data catalog).
+                Set to None by default (None defaults to the catalog id of the calling account in the service)
         :return: dict with keys "user", "password", "vendor", "url"
         """
-        return self._ssql_ctx.extractJDBCConf(connection_name)
+        return self._ssql_ctx.extractJDBCConf(connection_name, catalog_id)
