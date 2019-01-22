@@ -21,7 +21,7 @@ class Job:
 
     @classmethod
     def id_params(cls):
-        return [ '--JOB_NAME', '--JOB_ID', '--JOB_RUN_ID' ]
+        return [ '--JOB_NAME', '--JOB_ID', '--JOB_RUN_ID', '--SECURITY_CONFIGURATION' ]
 
     @classmethod
     def encryption_type_options(cls):

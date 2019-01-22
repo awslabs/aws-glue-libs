@@ -83,14 +83,14 @@ class DynamicFrame(object):
 
         def func(iterator):
             return ifilter(wrap_dict_with_dynamic_records, iterator)
-        return self.mapPartitions(func)
+        return self.mapPartitions(func, True, transformation_ctx, info, stageThreshold, totalThreshold)
 
-    def mapPartitions(self, f, preservesPartitioning=True):
+    def mapPartitions(self, f, preservesPartitioning=True, transformation_ctx="", info="", stageThreshold=0, totalThreshold=0):
         def func(s, iterator):
             return f(iterator)
-        return self.mapPartitionsWithIndex(func, preservesPartitioning)
+        return self.mapPartitionsWithIndex(func, preservesPartitioning, transformation_ctx, info, stageThreshold, totalThreshold)
 
-    def map(self, f, transformation_ctx = "", info="", stageThreshold=0, totalThreshold=0):
+    def map(self, f, preservesPartitioning=False,transformation_ctx = "", info="", stageThreshold=0, totalThreshold=0):
         def wrap_dict_with_dynamic_records(x):
             rec = _create_dynamic_record(x["record"])
             try:
@@ -107,11 +107,13 @@ class DynamicFrame(object):
                 return x
         def func(_, iterator):
             return imap(wrap_dict_with_dynamic_records, iterator)
-        return self.mapPartitionsWithIndex(func)
+        return self.mapPartitionsWithIndex(func, preservesPartitioning, transformation_ctx, info, stageThreshold, totalThreshold)
 
-    def mapPartitionsWithIndex(self, f, preservesPartitioning=True):
-        return DynamicFrame(self.glue_ctx._jvm.DynamicFrame.fromPythonRDD(
-            PipelinedRDD(self._rdd, f, preservesPartitioning)._jrdd, self.glue_ctx._ssql_ctx), self.glue_ctx, self.name)
+    def mapPartitionsWithIndex(self, f, preservesPartitioning=False, transformation_ctx = "", info = "", stageThreshold = 0,totalThreshold = 0):
+        return DynamicFrame(self.glue_ctx._jvm.DynamicFrame.fromPythonRDD(self._jdf,
+            PipelinedRDD(self._rdd, f, preservesPartitioning)._jrdd, self.glue_ctx._ssql_ctx, transformation_ctx, self.name,
+                                            _call_site(self._sc, callsite(), info), long(stageThreshold),
+                                            long(totalThreshold)), self.glue_ctx, self.name)
 
     def printSchema(self):
         print self._jdf.schema().treeString()
@@ -362,7 +364,7 @@ class DynamicFrame(object):
                 return java_cls.apply(tup4.apply(mapping_tup[0], mapping_tup[1], mapping_tup[2], mapping_tup[3]))
             else:
                 raise ValueError("Mapping tuple must be of length 2, 3, or 4"
-                                 "Got tuple of length " + len(mapping_tup))
+                                 "Got tuple of length " + str(len(mapping_tup)))
 
         if isinstance(mappings, tuple):
             mappings = [mappings]
@@ -539,7 +541,7 @@ class DynamicFrameReader(object):
                                                                     format,
                                                                     format_options, transformation_ctx, push_down_predicate, **kwargs)
 
-    def from_catalog(self, database = None, table_name = None, redshift_tmp_dir = "", transformation_ctx = "", push_down_predicate = "", additional_options = {}, **kwargs):
+    def from_catalog(self, database = None, table_name = None, redshift_tmp_dir = "", transformation_ctx = "", push_down_predicate = "", additional_options = {}, catalog_id = None, **kwargs):
         """Creates a DynamicFrame with the specified catalog name space and table name.
         """
         if database is not None and "name_space" in kwargs:
@@ -554,7 +556,7 @@ class DynamicFrameReader(object):
         if table_name is None:
             raise Exception("Parameter table_name is missing.")
 
-        return self._glue_context.create_dynamic_frame_from_catalog(db, table_name, redshift_tmp_dir, transformation_ctx, push_down_predicate, additional_options, **kwargs)
+        return self._glue_context.create_dynamic_frame_from_catalog(db, table_name, redshift_tmp_dir, transformation_ctx, push_down_predicate, additional_options, catalog_id, **kwargs)
 
 
 class DynamicFrameWriter(object):
@@ -571,7 +573,7 @@ class DynamicFrameWriter(object):
                                                                  format,
                                                                  format_options, transformation_ctx)
 
-    def from_catalog(self, frame, database = None, table_name = None, redshift_tmp_dir = "", transformation_ctx = "", additional_options = {}, **kwargs):
+    def from_catalog(self, frame, database = None, table_name = None, redshift_tmp_dir = "", transformation_ctx = "", additional_options = {}, catalog_id = None, **kwargs):
         """Creates a DynamicFrame with the specified catalog name space and table name.
         """
         if database is not None and "name_space" in kwargs:
@@ -586,7 +588,7 @@ class DynamicFrameWriter(object):
         if table_name is None:
             raise Exception("Parameter table_name is missing.")
 
-        return self._glue_context.write_dynamic_frame_from_catalog(frame, db, table_name, redshift_tmp_dir, transformation_ctx, additional_options)
+        return self._glue_context.write_dynamic_frame_from_catalog(frame, db, table_name, redshift_tmp_dir, transformation_ctx, additional_options, catalog_id)
 
     def from_jdbc_conf(self, frame, catalog_connection, connection_options={}, redshift_tmp_dir = "", transformation_ctx=""):
         """Creates a DynamicFrame with the specified JDBC connection information.
