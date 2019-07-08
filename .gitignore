@@ -1,0 +1,6 @@
+*.pyc
+PyGlue.zip
+conf/
+jars/
+derby.log
+metastore_db/
