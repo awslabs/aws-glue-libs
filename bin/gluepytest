@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+
+ROOT_DIR="$(cd $(dirname "$0")/..; pwd)"
+source $ROOT_DIR/bin/glue-setup.sh
+exec pytest "$@"
