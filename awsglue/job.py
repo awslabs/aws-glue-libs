@@ -13,25 +13,25 @@
 class Job:
     @classmethod
     def continuation_options(cls):
-        return [ '--continuation-option', 'continuation-enabled', 'continuation-readonly', 'continuation-ignore' ]
+        return ['--continuation-option', 'continuation-enabled', 'continuation-readonly', 'continuation-ignore']
 
     @classmethod
     def job_bookmark_options(cls):
-        return [ '--job-bookmark-option', 'job-bookmark-enable', 'job-bookmark-pause', 'job-bookmark-disable' ]
+        return ['--job-bookmark-option', 'job-bookmark-enable', 'job-bookmark-pause', 'job-bookmark-disable']
 
     @classmethod
     def id_params(cls):
-        return [ '--JOB_NAME', '--JOB_ID', '--JOB_RUN_ID', '--SECURITY_CONFIGURATION' ]
+        return ['--JOB_NAME', '--JOB_ID', '--JOB_RUN_ID', '--SECURITY_CONFIGURATION']
 
     @classmethod
     def encryption_type_options(cls):
-        return [ '--encryption-type' , 'sse-s3' ]
-    
+        return ['--encryption-type', 'sse-s3']
+
     def __init__(self, glue_context):
         self._job = glue_context._jvm.Job
         self._glue_context = glue_context
 
-    def init(self, job_name, args = {}):
+    def init(self, job_name, args={}):
         self._job.init(job_name, self._glue_context._glue_scala_context, args)
 
     def isInitialized(self):
@@ -39,4 +39,3 @@ class Job:
 
     def commit(self):
         self._job.commit()
-

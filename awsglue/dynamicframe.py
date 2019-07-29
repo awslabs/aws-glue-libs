@@ -9,10 +9,12 @@
 # on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, express
 # or implied. See the License for the specific language governing
 # permissions and limitations under the License.
+from __future__ import print_function
 
 import json
+from builtins import str, int
 from awsglue.utils import makeOptions, callsite
-from itertools import imap, ifilter
+from builtins import map, filter
 from awsglue.gluetypes import _deserialize_json_string, _create_dynamic_record, _revert_to_dict, _serialize_schema
 from awsglue.utils import _call_site, _as_java_list, _as_scala_option, _as_resolve_choiceOption
 from pyspark.rdd import RDD, PipelinedRDD
@@ -82,7 +84,7 @@ class DynamicFrame(object):
                     return True
 
         def func(iterator):
-            return ifilter(wrap_dict_with_dynamic_records, iterator)
+            return filter(wrap_dict_with_dynamic_records, iterator)
         return self.mapPartitions(func, True, transformation_ctx, info, stageThreshold, totalThreshold)
 
     def mapPartitions(self, f, preservesPartitioning=True, transformation_ctx="", info="", stageThreshold=0, totalThreshold=0):
@@ -106,17 +108,17 @@ class DynamicFrame(object):
                 x['errorMessage'] = E.message
                 return x
         def func(_, iterator):
-            return imap(wrap_dict_with_dynamic_records, iterator)
+            return map(wrap_dict_with_dynamic_records, iterator)
         return self.mapPartitionsWithIndex(func, preservesPartitioning, transformation_ctx, info, stageThreshold, totalThreshold)
 
     def mapPartitionsWithIndex(self, f, preservesPartitioning=False, transformation_ctx = "", info = "", stageThreshold = 0,totalThreshold = 0):
         return DynamicFrame(self.glue_ctx._jvm.DynamicFrame.fromPythonRDD(self._jdf,
             PipelinedRDD(self._rdd, f, preservesPartitioning)._jrdd, self.glue_ctx._ssql_ctx, transformation_ctx, self.name,
-                                            _call_site(self._sc, callsite(), info), long(stageThreshold),
-                                            long(totalThreshold)), self.glue_ctx, self.name)
+                                            _call_site(self._sc, callsite(), info), int(stageThreshold),
+                                            int(totalThreshold)), self.glue_ctx, self.name)
 
     def printSchema(self):
-        print self._jdf.schema().treeString()
+        print(self._jdf.schema().treeString())
 
     def toDF(self, options = None):
         """
@@ -172,40 +174,40 @@ class DynamicFrame(object):
         >>>unbox("a.b.c", "csv", separator="|")
         """
         return DynamicFrame(self._jdf.unbox(path, format, json.dumps(options), transformation_ctx,
-                                            _call_site(self._sc, callsite(), info), long(stageThreshold),
-                                            long(totalThreshold)),
+                                            _call_site(self._sc, callsite(), info), int(stageThreshold),
+                                            int(totalThreshold)),
                             self.glue_ctx, self.name)
 
     def drop_fields(self, paths, transformation_ctx = "", info = "", stageThreshold = 0, totalThreshold = 0):
         """
         :param paths: List of strings, each the full path to a node you want to drop
         :param info: String, any string to be associated with errors in this transformation.
-        :param stageThreshold: Long, number of errors in the given transformation for which the processing needs to error out.
-        :param totalThreshold: Long, total number of errors upto and including in this transformation
+        :param stageThreshold: Int, number of errors in the given transformation for which the processing needs to error out.
+        :param totalThreshold: Int, total number of errors upto and including in this transformation
           for which the processing needs to error out.
         :return: DynamicFrame
         """
-        if isinstance(paths, basestring):
+        if isinstance(paths, str):
             paths = [paths]
 
         return DynamicFrame(self._jdf.dropFields(self.glue_ctx._jvm.PythonUtils.toSeq(paths), transformation_ctx,
-                                                 _call_site(self._sc, callsite(), info), long(stageThreshold), long(totalThreshold)),
+                                                 _call_site(self._sc, callsite(), info), int(stageThreshold), int(totalThreshold)),
                             self.glue_ctx, self.name)
 
     def select_fields(self, paths, transformation_ctx = "", info = "", stageThreshold = 0, totalThreshold = 0):
         """
         :param paths: List of strings, each the full path to a node you want to get
         :param info: String, any string to be associated with errors in this transformation.
-        :param stageThreshold: Long, number of errors in the given transformation for which the processing needs to error out.
-        :param totalThreshold: Long, total number of errors upto and including in this transformation
+        :param stageThreshold: Int, number of errors in the given transformation for which the processing needs to error out.
+        :param totalThreshold: Int, total number of errors upto and including in this transformation
           for which the processing needs to error out.
         :return: DynamicFrame
         """
-        if isinstance(paths, basestring):
+        if isinstance(paths, str):
             paths = [paths]
 
         return DynamicFrame(self._jdf.selectFields(self.glue_ctx._jvm.PythonUtils.toSeq(paths), transformation_ctx,
-                                                   _call_site(self._sc, callsite(), info), long(stageThreshold), long(totalThreshold)),
+                                                   _call_site(self._sc, callsite(), info), int(stageThreshold), int(totalThreshold)),
                             self.glue_ctx, self.name)
 
     def split_fields(self, paths, name1, name2, transformation_ctx = "", info = "", stageThreshold = 0, totalThreshold = 0):
@@ -214,17 +216,17 @@ class DynamicFrame(object):
         :param name1: name for the dynamic frame to be split off
         :param name2: name for the dynamic frame remains on original
         :param info: String, any string to be associated with errors in this transformation.
-        :param stageThreshold: Long, number of errors in the given transformation for which the processing needs to error out.
-        :param totalThreshold: Long, total number of errors upto and including in this transformation
+        :param stageThreshold: Int, number of errors in the given transformation for which the processing needs to error out.
+        :param totalThreshold: Int, total number of errors upto and including in this transformation
           for which the processing needs to error out.
         :return: DynamicFrameCollection with two DynamicFrames, the first containing all the nodes that you have split off,
           the second containing the nodes remaining on the original.
         """
-        if isinstance(paths, basestring):
+        if isinstance(paths, str):
             paths = [paths]
 
         jdfs = _as_java_list(self._sc, self._jdf.splitFields(self.glue_ctx._jvm.PythonUtils.toSeq(paths), transformation_ctx,
-                                     _call_site(self._sc, callsite(), info), long(stageThreshold), long(totalThreshold)))
+                                     _call_site(self._sc, callsite(), info), int(stageThreshold), int(totalThreshold)))
         return DynamicFrameCollection({name1 : DynamicFrame(jdfs[0], self.glue_ctx, name1), name2 : DynamicFrame(jdfs[1], self.glue_ctx, name2)}, self.glue_ctx)
 
     def split_rows(self, comparison_dict, name1, name2, transformation_ctx = "", info= "", stageThreshold = 0, totalThreshold = 0):
@@ -236,8 +238,8 @@ class DynamicFrame(object):
         :param name1: name for the dynamic frame to be split off
         :param name2: name for the dynamic frame remains on original
         :param info: String, any string to be associated with errors in this transformation.
-        :param stageThreshold: Long, number of errors in the given transformation for which the processing needs to error out.
-        :param totalThreshold: Long, total number of errors upto and including in this transformation
+        :param stageThreshold: Int, number of errors in the given transformation for which the processing needs to error out.
+        :param totalThreshold: Int, total number of errors upto and including in this transformation
           for which the processing needs to error out.
         :return: DynamicFrameCollection with two DynamicFrames, the first containing all the nodes that you have split off,
           the second containing the nodes remaining on the original.
@@ -249,7 +251,7 @@ class DynamicFrame(object):
             for k, v in value.items():
                 operators.append(k)
                 if isinstance(v, int):
-                    values.append(long(v))
+                    values.append(int(v))
                 else:
                     values.append(v)
 
@@ -265,13 +267,13 @@ class DynamicFrame(object):
         :param oldName: String, full path to the node you want to rename
         :param newName: String, new name including full path
         :param info: String, any string to be associated with errors in this transformation.
-        :param stageThreshold: Long, number of errors in the given transformation for which the processing needs to error out.
-        :param totalThreshold: Long, total number of errors upto and including in this transformation
+        :param stageThreshold: Int, number of errors in the given transformation for which the processing needs to error out.
+        :param totalThreshold: Int, total number of errors upto and including in this transformation
           for which the processing needs to error out.
         :return: DynamicFrame
         """
         return DynamicFrame(self._jdf.renameField(oldName, newName, transformation_ctx, _call_site(self._sc, callsite(), info),
-                                                  long(stageThreshold), long(totalThreshold)), self.glue_ctx, self.name)
+                                                  int(stageThreshold), int(totalThreshold)), self.glue_ctx, self.name)
 
     def write(self, connection_type, connection_options={},
               format=None, format_options={}, accumulator_size = 0):
@@ -287,14 +289,14 @@ class DynamicFrame(object):
 
     def spigot(self, path, options={}, transformation_ctx = "", info = "", stageThreshold = 0, totalThreshold = 0):
         return DynamicFrame(self._jdf.spigot(path, makeOptions(self._sc, options), transformation_ctx,
-                                             _call_site(self._sc, callsite(), info), long(stageThreshold),
-                                             long(totalThreshold)),
+                                             _call_site(self._sc, callsite(), info), int(stageThreshold),
+                                             int(totalThreshold)),
                             self.glue_ctx, self.name)
-            
+
     def join(self, paths1, paths2, frame2, transformation_ctx = "", info = "", stageThreshold = 0, totalThreshold = 0):
-        if isinstance(paths1, basestring):
+        if isinstance(paths1, str):
             paths1 = [paths1]
-        if isinstance(paths2, basestring):
+        if isinstance(paths2, str):
             paths2 = [paths2]
 
         return DynamicFrame(self._jdf.join(self.glue_ctx._jvm.PythonUtils.toSeq(paths1), self.glue_ctx._jvm.PythonUtils.toSeq(paths2), frame2._jdf, transformation_ctx, _call_site(self._sc, callsite(), info), long(stageThreshold), long(totalThreshold)), self.glue_ctx, self.name + frame2.name)
@@ -304,14 +306,14 @@ class DynamicFrame(object):
         unnest a dynamic frame. i.e. flattens nested objects to top level elements.
         It also generates joinkeys for array objects
         :param info: String, any string to be associated with errors in this transformation.
-        :param stageThreshold: Long, number of errors in the given transformation for which the processing needs to error out.
-        :param totalThreshold: Long, total number of errors upto and including in this transformation
+        :param stageThreshold: Int, number of errors in the given transformation for which the processing needs to error out.
+        :param totalThreshold: Int, total number of errors upto and including in this transformation
           for which the processing needs to error out.
         :return: a new unnested dynamic frame
 
         >>>unnest()
         """
-        return DynamicFrame(self._jdf.unnest(transformation_ctx, _call_site(self._sc, callsite(), info), long(stageThreshold), long(totalThreshold)), self.glue_ctx, self.name)
+        return DynamicFrame(self._jdf.unnest(transformation_ctx, _call_site(self._sc, callsite(), info), int(stageThreshold), int(totalThreshold)), self.glue_ctx, self.name)
 
     def relationalize(self, root_table_name, staging_path, options={}, transformation_ctx = "", info = "", stageThreshold = 0, totalThreshold = 0):
         """
@@ -325,15 +327,15 @@ class DynamicFrame(object):
         :param options: dict of optional parameters for relationalize
         :param transformation_ctx: context key to retrieve metadata about the current transformation
         :param info: String, any string to be associated with errors in this transformation.
-        :param stageThreshold: Long, number of errors in the given transformation for which the processing needs to error out.
-        :param totalThreshold: Long, total number of errors upto and including in this transformation
+        :param stageThreshold: Int, number of errors in the given transformation for which the processing needs to error out.
+        :param totalThreshold: Int, total number of errors upto and including in this transformation
           for which the processing needs to error out.
         :return: DynamicFrameCollection
         """
         _rFrames = _as_java_list(self._sc, self._jdf.relationalize(root_table_name, staging_path,
                                                               makeOptions(self._sc, options),
                                                               transformation_ctx, _call_site(self._sc, callsite(), info),
-                                                              long(stageThreshold), long(totalThreshold)))
+                                                              int(stageThreshold), int(totalThreshold)))
         return DynamicFrameCollection(dict((df.getName(), DynamicFrame(df, self.glue_ctx, df.getName())) for df in _rFrames), self.glue_ctx)
 
     def applyMapping(self, *args, **kwargs):
@@ -375,7 +377,7 @@ class DynamicFrame(object):
             self.glue_ctx._jvm.PythonUtils.toSeq(mappings_list),
             case_sensitive,
             transformation_ctx,
-            _call_site(self._sc, callsite(), info), long(stageThreshold), long(totalThreshold))
+            _call_site(self._sc, callsite(), info), int(stageThreshold), int(totalThreshold))
 
         return DynamicFrame(new_jdf, self.glue_ctx, self.name)
 
@@ -416,7 +418,7 @@ class DynamicFrame(object):
             self.glue_ctx._jvm.PythonUtils.toSeq(specs_list),
             choice_option, database_option, table_name_option,
             transformation_ctx,
-            _call_site(self._sc, callsite(), info), long(stageThreshold), long(totalThreshold))
+            _call_site(self._sc, callsite(), info), int(stageThreshold), int(totalThreshold))
 
         return DynamicFrame(new_jdf, self.glue_ctx, self.name)
 
@@ -430,14 +432,14 @@ class DynamicFrame(object):
     def errorsCount(self):
         """
         Returns the total error records in a DynamicFrames
-        :return: Long
+        :return: Int
         """
         return self._jdf.errorsCount()
 
     def stageErrorsCount(self):
         """
         Returns the error generated in the transformation to this DynamicFrame
-        :return: Long
+        :return: Int
         """
         return self._jdf.stageErrorsCount()
 

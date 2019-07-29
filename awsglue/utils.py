@@ -13,8 +13,7 @@
 import argparse
 import json
 import traceback
-import sys
-from job import Job
+from awsglue.job import Job
 
 _global_args = {}
 
