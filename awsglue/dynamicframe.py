@@ -380,7 +380,7 @@ class DynamicFrame(object):
         return DynamicFrame(new_jdf, self.glue_ctx, self.name)
 
     def resolveChoice(self, specs=None, choice="", database=None, table_name=None,
-                      transformation_ctx="", info="", stageThreshold=0, totalThreshold=0):
+                      transformation_ctx="", info="", stageThreshold=0, totalThreshold=0, catalog_id=None):
         """
         :param specs: specification for choice type and corresponding resolve action,
                       if the specs is empty, then tape backend would go one round of the data
@@ -416,8 +416,25 @@ class DynamicFrame(object):
             self.glue_ctx._jvm.PythonUtils.toSeq(specs_list),
             choice_option, database_option, table_name_option,
             transformation_ctx,
-            _call_site(self._sc, callsite(), info), long(stageThreshold), long(totalThreshold))
+            _call_site(self._sc, callsite(), info), long(stageThreshold), long(totalThreshold),
+            _as_scala_option(self._sc, catalog_id))
 
+        return DynamicFrame(new_jdf, self.glue_ctx, self.name)
+
+    def getNumPartitions(self):
+        """Returns the number of partitions in the current DynamicFrame."""
+        return self._jdf.getNumPartitions()
+
+    def repartition(self, num_partitions, transformation_ctx = "", info = "", stageThreshold = 0, totalThreshold = 0):
+        new_jdf = self._jdf.repartition(num_partitions, transformation_ctx,
+                                        _call_site(self._sc, callsite(), info),
+                                        long(stageThreshold), long(totalThreshold))
+        return DynamicFrame(new_jdf, self.glue_ctx, self.name)
+
+    def coalesce(self, num_partitions, shuffle = False, transformation_ctx = "", info = "", stageThreshold = 0, totalThreshold = 0):
+        new_jdf = self._jdf.coalesce(num_partitions, shuffle, transformation_ctx,
+                                        _call_site(self._sc, callsite(), info),
+                                        long(stageThreshold), long(totalThreshold))
         return DynamicFrame(new_jdf, self.glue_ctx, self.name)
 
     def errorsAsDynamicFrame(self):

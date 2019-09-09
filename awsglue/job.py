@@ -18,6 +18,9 @@ class Job:
     @classmethod
     def job_bookmark_options(cls):
         return [ '--job-bookmark-option', 'job-bookmark-enable', 'job-bookmark-pause', 'job-bookmark-disable' ]
+    @classmethod
+    def job_bookmark_range_options(cls):
+        return [ '--job-bookmark-from', '--job-bookmark-to' ]
 
     @classmethod
     def id_params(cls):

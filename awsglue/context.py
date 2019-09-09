@@ -26,6 +26,7 @@ from py4j.java_gateway import JavaClass
 
 def register(sc):
     java_import(sc._jvm, "com.amazonaws.services.glue.*")
+    java_import(sc._jvm, "com.amazonaws.services.glue.log.GlueLogger")
     java_import(sc._jvm, "com.amazonaws.services.glue.schema.*")
     java_import(sc._jvm, "com.amazonaws.services.glue.util.JsonOptions")
     java_import(sc._jvm, "org.apache.spark.sql.glue.util.SparkUtility")
@@ -45,6 +46,7 @@ class GlueContext(SQLContext):
         self.create_dynamic_frame = DynamicFrameReader(self)
         self.write_dynamic_frame = DynamicFrameWriter(self)
         self.spark_session = SparkSession(sparkContext, self._glue_scala_context.getSparkSession())
+        self._glue_logger = sparkContext._jvm.GlueLogger()
 
     @property
     def _ssql_ctx(self):
@@ -299,3 +301,6 @@ class GlueContext(SQLContext):
         :return: dict with keys "user", "password", "vendor", "url"
         """
         return self._ssql_ctx.extractJDBCConf(connection_name, catalog_id)
+
+    def get_logger(self):
+        return self._glue_logger
