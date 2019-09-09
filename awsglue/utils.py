@@ -72,6 +72,11 @@ def getResolvedOptions(args, options):
     parser.add_argument(Job.job_bookmark_options()[0], choices =Job.job_bookmark_options()[1:], required = False)
     parser.add_argument(Job.continuation_options()[0], choices =Job.continuation_options()[1:], required = False)
 
+    for option in Job.job_bookmark_range_options():
+        if option[2:] in options:
+            raise RuntimeError("Using reserved arguments " + option)
+        parser.add_argument(option, required=False)
+
     for option in Job.id_params()[1:]:
         if option in options:
             raise RuntimeError("Using reserved arguments " + option)
@@ -117,6 +122,17 @@ def getResolvedOptions(args, options):
             bookmark_value = Job.job_bookmark_options()[option_index]
 
         parsed_dict['job_bookmark_option'] = bookmark_value
+    absent_range_option = []
+    for option in Job.job_bookmark_range_options():
+       key = option[2:].replace('-','_')
+       if key not in parsed_dict or parsed_dict[key] is None:
+           absent_range_option.append(option)
+    if parsed_dict['job_bookmark_option']  == 'job-bookmark-pause':
+        if len(absent_range_option) == 1:
+            raise RuntimeError("Missing option or value for "  +  absent_range_option[0])
+    else:
+        if len(absent_range_option) == 0:
+            raise RuntimeError("Invalid option(s)"  +  ' '.join(Job.job_bookmark_range_options()))
 
     _global_args.update(parsed_dict)
 
