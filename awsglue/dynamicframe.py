@@ -10,15 +10,23 @@
 # or implied. See the License for the specific language governing
 # permissions and limitations under the License.
 
+from __future__ import print_function
 import json
+import sys
 from awsglue.utils import makeOptions, callsite
-from itertools import imap, ifilter
 from awsglue.gluetypes import _deserialize_json_string, _create_dynamic_record, _revert_to_dict, _serialize_schema
-from awsglue.utils import _call_site, _as_java_list, _as_scala_option, _as_resolve_choiceOption
+from awsglue.utils import _call_site, _as_java_list, _as_scala_option, _as_resolve_choiceOption, iteritems, itervalues
 from pyspark.rdd import RDD, PipelinedRDD
 from pyspark.sql.dataframe import DataFrame
 from pyspark.serializers import PickleSerializer, BatchedSerializer
 
+if sys.version >= "3":
+    long = int
+    basestring = unicode = str
+    imap=map
+    ifilter=filter
+else:
+    from itertools import imap, ifilter
 
 class ResolveOption(object):
     """
@@ -78,7 +86,7 @@ class DynamicFrame(object):
                     if isinstance(E, KeyError) or isinstance(E, ValueError) or isinstance(E, TypeError):
                         return False
                     x['isError'] = True
-                    x['errorMessage'] = E.message
+                    x['errorMessage'] = str(E)
                     return True
 
         def func(iterator):
@@ -103,7 +111,7 @@ class DynamicFrame(object):
                 return x
             except Exception as E:
                 x['isError'] = True
-                x['errorMessage'] = E.message
+                x['errorMessage'] = str(E)
                 return x
         def func(_, iterator):
             return imap(wrap_dict_with_dynamic_records, iterator)
@@ -116,7 +124,7 @@ class DynamicFrame(object):
                                             long(totalThreshold)), self.glue_ctx, self.name)
 
     def printSchema(self):
-        print self._jdf.schema().treeString()
+        print(self._jdf.schema().treeString())
 
     def toDF(self, options = None):
         """
@@ -508,7 +516,7 @@ class DynamicFrameCollection(object):
         :return: a DynamicFrameCollection
         """
         new_dict = {}
-        for k,v in self._df_dict.iteritems():
+        for k,v in iteritems(self._df_dict):
             res = callable(v, transformation_ctx+':'+k)
             if not isinstance(res, DynamicFrame):
                 raise TypeError("callable must return a DynamicFrame. "\
@@ -525,7 +533,7 @@ class DynamicFrameCollection(object):
         """
         new_dict = {}
 
-        for frame in self._df_dict.itervalues():
+        for frame in itervalues(self._df_dict):
             res = f(frame, transformation_ctx+':'+frame.name)
 
             if isinstance(res, DynamicFrame):

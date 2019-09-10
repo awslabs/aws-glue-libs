@@ -14,7 +14,7 @@ import argparse
 import json
 import traceback
 import sys
-from job import Job
+from awsglue.job import Job
 
 _global_args = {}
 
@@ -48,6 +48,22 @@ def _as_resolve_choiceOption(sc, choice_option_str):
 def callsite():
     return "".join(traceback.format_list(traceback.extract_stack()[:-2]))
 
+
+# Definitions for Python 2/Python 3
+if sys.version >= "3":
+    def iteritems(d, **kwargs):
+        return iter(d.items(**kwargs))
+    def iterkeys(d, **kwargs):
+        return iter(d.values(**kwargs))
+    def itervalues(d, **kwargs):
+        return iter(d.values(**kwargs))
+else:
+    def iteritems(d, **kwargs):
+        return d.iteritems(**kwargs)
+    def iterkeys(d, **kwargs):
+        return d.iterkeys(**kwargs)
+    def itervalues(d, **kwargs):
+        return d.itervalues(**kwargs)
 
 class GlueArgumentError(Exception):
     pass

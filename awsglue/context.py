@@ -196,7 +196,7 @@ class GlueContext(SQLContext):
                            connection_options={}, format={}, format_options={},
                            transformation_ctx = "", **kwargs):
         if isinstance(frame_or_dfc, DynamicFrameCollection):
-            new_options = dict(connection_options.items()
+            new_options = dict(list(connection_options.items())
                                + [("useFrameName", True)])
         elif isinstance(frame_or_dfc, DynamicFrame):
             new_options = connection_options
@@ -266,7 +266,7 @@ class GlueContext(SQLContext):
     def write_from_jdbc_conf(self, frame_or_dfc, catalog_connection, connection_options={},
                              redshift_tmp_dir = "", transformation_ctx = "", catalog_id = None):
         if isinstance(frame_or_dfc, DynamicFrameCollection):
-            new_options = dict(connection_options.items()
+            new_options = dict(list(connection_options.items())
                                + [("useFrameName", True)])
         elif isinstance(frame_or_dfc, DynamicFrame):
             new_options = connection_options
