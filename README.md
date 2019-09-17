@@ -11,13 +11,16 @@ The Glue ETL jars are now available via the maven build system in a s3 backed ma
 maven to get all the dependencies needed for glue locally.
 
 Install apache maven from the following location:
-http://apache.mirrors.tds.net/maven/maven-3/3.6.0/binaries/apache-maven-3.6.0-bin.tar.gz
+https://aws-glue-etl-artifacts.s3.amazonaws.com/glue-common/apache-maven-3.6.0-bin.tar.gz
 
-Install the spark distribution from the following location:
-https://archive.apache.org/dist/spark/spark-2.2.1/spark-2.2.1-bin-hadoop2.7.tgz
+Install the spark distribution from the following location based on the glue version:
+Glue version 0.9: https://aws-glue-etl-artifacts.s3.amazonaws.com/glue-0.9/spark-2.2.1-bin-hadoop2.7.tgz
+Glue version 1.0: https://aws-glue-etl-artifacts.s3.amazonaws.com/glue-1.0/spark-2.4.3-bin-hadoop2.8.tgz
 
 Export SPARK_HOME environment variable to extracted location of the
-above spark archive.(ex: export SPARK_HOME=/home/$USER/spark-2.2.1-bin-hadoop2.7)
+above spark archive.
+Glue version 0.9: export SPARK_HOME=/home/$USER/spark-2.2.1-bin-hadoop2.7
+Glue version 1.0: export SPARK_HOME=/home/$USER/spark-2.4.3-bin-spark-2.4.3-bin-hadoop2.8
 
 The gluepytest script assumes that the pytest module is installed and available in the PATH
 
