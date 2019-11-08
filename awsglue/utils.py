@@ -60,6 +60,10 @@ class GlueArgumentParser(argparse.ArgumentParser):
         raise GlueArgumentError(msg)
 
 
+def strip_option_prefix(option):
+    return option.lstrip('--')
+
+
 def getResolvedOptions(args, options):
     parser = GlueArgumentParser()
 
@@ -78,12 +82,12 @@ def getResolvedOptions(args, options):
         parser.add_argument(option, required=False)
 
     for option in Job.id_params()[1:]:
-        if option in options:
+        if strip_option_prefix(option) in options:
             raise RuntimeError("Using reserved arguments " + option)
         # TODO: Make these mandatory, for now for backward compatability making these optional, also not including JOB_NAME in the reserved parameters list.
         parser.add_argument(option, required=False)
 
-    if Job.encryption_type_options()[0] in options:
+    if strip_option_prefix(Job.encryption_type_options()[0]) in options:
         raise RuntimeError("Using reserved arguments " + Job.encryption_type_options()[0])
     parser.add_argument(Job.encryption_type_options()[0], choices = Job.encryption_type_options()[1:])
         
