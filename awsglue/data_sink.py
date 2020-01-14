@@ -10,8 +10,8 @@
 # or implied. See the License for the specific language governing
 # permissions and limitations under the License.
 
-from awsglue.dynamicframe import DynamicFrame, DynamicFrameCollection
-from awsglue.utils import makeOptions, callsite
+from .dynamicframe import DynamicFrame, DynamicFrameCollection
+from .utils import makeOptions, callsite
 
 class DataSink(object):
     def __init__(self, j_sink, sql_ctx):

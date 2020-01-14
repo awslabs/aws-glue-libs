@@ -10,8 +10,8 @@
 # or implied. See the License for the specific language governing
 # permissions and limitations under the License.
 
-from awsglue.dynamicframe import DynamicFrame
-from awsglue.utils import makeOptions, callsite
+from .dynamicframe import DynamicFrame
+from .utils import makeOptions, callsite
 
 class DataSource(object):
     def __init__(self, j_source, sql_ctx, name):

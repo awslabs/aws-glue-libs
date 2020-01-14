@@ -12,7 +12,7 @@
 
 import json
 import sys
-from awsglue.utils import iteritems
+from .utils import iteritems
 
 
 if sys.version >= "3":

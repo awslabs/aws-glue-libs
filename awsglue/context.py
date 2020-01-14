@@ -13,11 +13,11 @@
 from pyspark.sql import SQLContext
 from pyspark.sql import SparkSession
 from py4j.java_gateway import java_import
-from awsglue.data_source import DataSource
-from awsglue.data_sink import DataSink
-from awsglue.dynamicframe import DynamicFrame, DynamicFrameReader, DynamicFrameWriter, DynamicFrameCollection
-from awsglue.gluetypes import DataType
-from awsglue.utils import makeOptions, callsite
+from .data_source import DataSource
+from .data_sink import DataSink
+from .dynamicframe import DynamicFrame, DynamicFrameReader, DynamicFrameWriter, DynamicFrameCollection
+from .gluetypes import DataType
+from .utils import makeOptions, callsite
 import pyspark
 import os
 import re
