@@ -1,4 +1,4 @@
-# Copyright 2016-2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+# Copyright 2016-2020 Amazon.com, Inc. or its affiliates. All Rights Reserved.
 # Licensed under the Amazon Software License (the "License"). You may not use
 # this file except in compliance with the License. A copy of the License is
 # located at
@@ -13,6 +13,7 @@
 from pyspark.sql import SQLContext
 from pyspark.sql import SparkSession
 from py4j.java_gateway import java_import
+
 from awsglue.data_source import DataSource
 from awsglue.data_sink import DataSink
 from awsglue.dynamicframe import DynamicFrame, DynamicFrameReader, DynamicFrameWriter, DynamicFrameCollection
@@ -23,6 +24,8 @@ import os
 import re
 import uuid
 from py4j.java_gateway import JavaClass
+import time
+import logging
 
 def register(sc):
     java_import(sc._jvm, "com.amazonaws.services.glue.*")
@@ -34,7 +37,6 @@ def register(sc):
     java_import(sc._jvm, "com.amazonaws.services.glue.util.AWSConnectionUtils")
     java_import(sc._jvm, "com.amazonaws.services.glue.util.GluePythonUtils")
     java_import(sc._jvm, "com.amazonaws.services.glue.errors.CallSite")
-
 
 class GlueContext(SQLContext):
     Spark_SQL_Formats = {"parquet", "orc"}
@@ -98,6 +100,9 @@ class GlueContext(SQLContext):
             prefix = re.sub('[-]', '_', prefix)
 
         return DataSource(j_source, self, prefix)
+
+    def get_catalog_schema_as_spark_schema(self, database = None, table_name = None, catalog_id = None):
+        return self._ssql_ctx.getCatalogSchemaAsSparkSchema(database, table_name, catalog_id)
 
     def create_dynamic_frame_from_rdd(self, data, name, schema=None, sample_ratio=None, transformation_ctx=""):
         """Creates a DynamicFrame from an RDD.
@@ -302,5 +307,92 @@ class GlueContext(SQLContext):
         """
         return self._ssql_ctx.extractJDBCConf(connection_name, catalog_id)
 
+    def purge_table(self, database, table_name, options={}, transformation_ctx="", catalog_id=None):
+        """
+        Delete files from s3 for the given catalog's database and table. If all files in a partition are deleted, that
+        partition is deleted from the catalog too
+        :param database: database name in catalog
+        :param table_name: table name in catalog
+        :param options: Options to filter files to be deleted and manifest file generation
+            retentionPeriod: Number of hours. Files newer than the retention period will be retained.
+                168 hours - (7 days) by default
+            partitionPredicate: Partitions satisfying this predicate will be deleted.
+                Files within the retention period in these partitions will not be deleted.
+                "" - empty by default
+            excludeStorageClasses: Files with storage class in the excludeStorageClasses set are not deleted.
+                Set() - empty set by default
+            manifestFilePath: optional path for manifest file generation. All files that were successfully purged
+                or transitioned will be recorded in Success.csv and those that failed in Failed.csv
+        :param transformation_ctx: transformation context (used in manifest file path)
+        :param catalog_id: catalog id of the DataCatalog being accessed (account id of the data catalog).
+                Set to None by default (None defaults to the catalog id of the calling account in the service)
+        :return: void return type
+        """
+        self._ssql_ctx.purgeTable(database, table_name, makeOptions(self._sc, options), transformation_ctx, catalog_id)
+
+    def purge_s3_path(self, s3_path, options={}, transformation_ctx=""):
+        """
+        Deletes files from a given s3 path recursively
+        :param s3_path: s3 path of the files to be deleted in the format s3://<bucket>/<prefix>/
+        :param options: Options to filter files to be deleted and manifest file generation
+            retentionPeriod: Number of hours. Files newer than the retention period will be retained.
+                168 hours - (7 days) by default
+            excludeStorageClasses: Files with storage class in the excludeStorageClasses set are not deleted.
+                Set() - empty set by default
+            manifestFilePath: optional path for manifest file generation. All files that were successfully purged
+                or transitioned will be recorded in Success.csv and those that failed in Failed.csv
+        :param transformation_ctx: transformation context (used in manifest file path)
+        :return: void return type
+        """
+        self._ssql_ctx.purgeS3Path(s3_path, makeOptions(self._sc, options), transformation_ctx)
+
+    def transition_table(self, database, table_name, transition_to, options={}, transformation_ctx="", catalog_id=None):
+        """
+        Transitions the storage class of the files stored on s3 for the given catalog's database and table
+        :param database: database name in catalog
+        :param table_name: table name in catalog
+        :param transition_to: S3 storage class to transition to
+            https://docs.aws.amazon.com/AWSJavaSDK/latest/javadoc/com/amazonaws/services/s3/model/StorageClass.html
+        :param options: Options to filter files to be transitioned and manifest file generation
+            retentionPeriod: Number of hours. Files newer than the retention period will be retained.
+                168 hours - (7 days) by default
+            partitionPredicate: Partitions satisfying this predicate will be deleted.
+                Files within the retention period in these partitions will not be deleted.
+                "" - empty by default
+            excludeStorageClasses: Files with storage class in the excludeStorageClasses set are not deleted.
+                Set() - empty set by default
+            manifestFilePath: optional path for manifest file generation. All files that were successfully purged
+                or transitioned will be recorded in Success.csv and those that failed in Failed.csv
+            accountId: AWS accountId to run the Transition batch job. Mandatory for Transition transform
+            roleArn: AWS role to run the Transition batch job. Mandatory for Transition transform
+        :param transformation_ctx: transformation context (used in manifest file path)
+        :param catalog_id: catalog id of the DataCatalog being accessed (account id of the data catalog).
+                Set to None by default (None defaults to the catalog id of the calling account in the service)
+        :return: void return type
+        """
+        self._ssql_ctx.transitionTable(database, table_name, transition_to, makeOptions(self._sc, options),
+                                       transformation_ctx, catalog_id)
+
+    def transition_s3_path(self, s3_path, transition_to, options={}, transformation_ctx=""):
+        """
+        Transition files in a given s3 path recursively
+        :param s3_path: s3 path of the files to be transitioned in the format s3://<bucket>/<prefix>/
+        :param transition_to: S3 storage class to transition to
+            https://docs.aws.amazon.com/AWSJavaSDK/latest/javadoc/com/amazonaws/services/s3/model/StorageClass.html
+        :param options: Options to filter files to be deleted and manifest file generation
+            retentionPeriod Number of hours. Files newer than the retention period will be retained.
+                168 hours - (7 days) by default
+            excludeStorageClasses Files with storage class in the excludeStorageClasses set are not deleted.
+                Set() - empty set by default
+            manifestFilePath optional path for manifest file generation. All files that were successfully purged
+                or transitioned will be recorded in Success.csv and those that failed in Failed.csv
+            accountId: AWS accountId to run the Transition batch job. Mandatory for Transition transform
+            roleArn: AWS role to run the Transition batch job. Mandatory for Transition transform
+        :param transformation_ctx: transformation context (used in manifest file path)
+        :return: void return type
+        """
+        self._ssql_ctx.transitionS3Path(s3_path, transition_to, makeOptions(self._sc, options), transformation_ctx)
+
     def get_logger(self):
         return self._glue_logger
+

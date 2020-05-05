@@ -1,4 +1,4 @@
-# Copyright 2016-2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+# Copyright 2016-2020 Amazon.com, Inc. or its affiliates. All Rights Reserved.
 # Licensed under the Amazon Software License (the "License"). You may not use
 # this file except in compliance with the License. A copy of the License is
 # located at
@@ -24,12 +24,13 @@ from .errors_as_dynamicframe import ErrorsAsDynamicFrame
 from .dynamicframe_filter import Filter
 from .dynamicframe_map import Map
 from .coalesce import Coalesce
+from .union import Union
 import json
 
 ALL_TRANSFORMS = {Unbox, RenameField, DropFields, SplitFields, SelectFields, SplitRows,
                   UnnestFrame, Relationalize, SelectFromCollection,
                   MapToCollection, ErrorsAsDynamicFrame, FlatMap, DropNullFields,
-                  Join, ApplyMapping, Repartition, ResolveChoice, Spigot, Filter, Map, Coalesce}
+                  Join, ApplyMapping, Repartition, ResolveChoice, Spigot, Filter, Map, Coalesce, Union}
 
 __all__ = [transform.__name__ for transform in ALL_TRANSFORMS]
 
