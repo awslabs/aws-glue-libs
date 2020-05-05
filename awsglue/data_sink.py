@@ -1,4 +1,4 @@
-# Copyright 2016-2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+# Copyright 2016-2020 Amazon.com, Inc. or its affiliates. All Rights Reserved.
 # Licensed under the Amazon Software License (the "License"). You may not use
 # this file except in compliance with the License. A copy of the License is
 # located at
@@ -23,6 +23,9 @@ class DataSink(object):
 
     def setAccumulableSize(self, size):
         self._jsink.setAccumulableSize(size)
+
+    def setCatalogInfo(self, catalogDatabase, catalogTableName, catalogId = ""):
+        self._jsink.setCatalogInfo(catalogDatabase, catalogTableName, catalogId)
 
     def writeFrame(self, dynamic_frame, info = ""):
         return DynamicFrame(self._jsink.pyWriteDynamicFrame(dynamic_frame._jdf, callsite(), info), dynamic_frame.glue_ctx, dynamic_frame.name + "_errors")
