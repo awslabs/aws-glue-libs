@@ -17,17 +17,39 @@ Install the spark distribution from the following location based on the glue ver
 Glue version 0.9: https://aws-glue-etl-artifacts.s3.amazonaws.com/glue-0.9/spark-2.2.1-bin-hadoop2.7.tgz
 Glue version 1.0: https://aws-glue-etl-artifacts.s3.amazonaws.com/glue-1.0/spark-2.4.3-bin-hadoop2.8.tgz
 
-Export SPARK_HOME environment variable to extracted location of the
+Export `SPARK_HOME` environment variable to extracted location of the
 above spark archive.
-Glue version 0.9: export SPARK_HOME=/home/$USER/spark-2.2.1-bin-hadoop2.7
-Glue version 1.0: export SPARK_HOME=/home/$USER/spark-2.4.3-bin-spark-2.4.3-bin-hadoop2.8
+
+Glue version 0.9: 
+```bash
+export SPARK_HOME=/home/$USER/spark-2.2.1-bin-hadoop2.7
+```
+
+Glue version 1.0: 
+```bash
+export SPARK_HOME=/home/$USER/spark-2.4.3-bin-spark-2.4.3-bin-hadoop2.8
+```
+
 
 The gluepytest script assumes that the pytest module is installed and available in the PATH
 
-Glue shell: ./bin/gluepyspark
-Glue submit: ./bin/gluesparksubmit
-pytest: ./bin/gluepytest
+Glue shell: `./bin/gluepyspark`
 
+Glue submit: `./bin/gluesparksubmit`
+
+pytest: `./bin/gluepytest`
+
+
+#### Windows platform instructions
+You must set HADOOP_HOME environment variable to your windows binaries distribution for hadoop. You can download windows binaries for hadoop from the following URL
+https://github.com/steveloughran/winutils
+
+Since above spark distribution is based on Hadoop 2.8 we can set `HADOOP_HOME` variable to `hadoop-2.8.3` directory of the above downloaded repository.
+
+ 
+```
+export HADOOP_HOME=/home/$USER/winutils/hadoop-2.8.3
+```
 ## Licensing
 
 The libraries in this repository licensed under the [Amazon Software License](http://aws.amazon.com/asl/) (the "License"). They may not be used except in compliance with the License, a copy of which is included here in the LICENSE file.
