@@ -2,5 +2,6 @@
 PyGlue.zip
 conf/
 jars/
+jarsv1/
 derby.log
 metastore_db/
