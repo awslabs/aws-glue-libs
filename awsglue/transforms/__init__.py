@@ -10,26 +10,27 @@
 # or implied. See the License for the specific language governing
 # permissions and limitations under the License.
 
-from transform import GlueTransform
-from unbox import Unbox
-from unnest_frame import UnnestFrame
-from relationalize import Relationalize
-from field_transforms import RenameField, DropFields, SelectFields, SplitFields, SplitRows, Join, Spigot
-from collection_transforms import SelectFromCollection, MapToCollection, FlatMap
-from drop_nulls import DropNullFields
-from apply_mapping import ApplyMapping
-from repartition import Repartition
-from resolve_choice import ResolveChoice
-from errors_as_dynamicframe import ErrorsAsDynamicFrame
-from dynamicframe_filter import Filter
-from dynamicframe_map import Map
-from coalesce import Coalesce
+from .transform import GlueTransform
+from .unbox import Unbox
+from .unnest_frame import UnnestFrame
+from .relationalize import Relationalize
+from .field_transforms import RenameField, DropFields, SelectFields, SplitFields, SplitRows, Join, Spigot
+from .collection_transforms import SelectFromCollection, MapToCollection, FlatMap
+from .drop_nulls import DropNullFields
+from .apply_mapping import ApplyMapping
+from .repartition import Repartition
+from .resolve_choice import ResolveChoice
+from .errors_as_dynamicframe import ErrorsAsDynamicFrame
+from .dynamicframe_filter import Filter
+from .dynamicframe_map import Map
+from .coalesce import Coalesce
+from .union import Union
 import json
 
 ALL_TRANSFORMS = {Unbox, RenameField, DropFields, SplitFields, SelectFields, SplitRows,
                   UnnestFrame, Relationalize, SelectFromCollection,
                   MapToCollection, ErrorsAsDynamicFrame, FlatMap, DropNullFields,
-                  Join, ApplyMapping, Repartition, ResolveChoice, Spigot, Filter, Map, Coalesce}
+                  Join, ApplyMapping, Repartition, ResolveChoice, Spigot, Filter, Map, Coalesce, Union}
 
 __all__ = [transform.__name__ for transform in ALL_TRANSFORMS]
 

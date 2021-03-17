@@ -12,23 +12,23 @@
 
 from awsglue.transforms import GlueTransform
 
-class Coalesce(GlueTransform):
-    def __call__(self, frame, num_partitions, shuffle = False, transformation_ctx = "", info = "",
-                 stageThreshold = 0, totalThreshold = 0):
-        return frame.coalesce(num_partitions, shuffle, transformation_ctx, info, stageThreshold, totalThreshold)
+class Union(GlueTransform):
+    def __call__(self, frame1, frame2, transformation_ctx = "",
+                 info = "", stageThreshold = 0, totalThreshold = 0):
+        return frame1.union(mappings, case_sensitive)
 
     @classmethod
     def describeArgs(cls):
-        arg1 = {"name": "num_partitions",
+        arg1 = {"name": "frame1",
                 "type": "DynamicFrame",
-                "description": "Number of partitions",
+                "description": "First DynamicFrame to union.",
                 "optional": False,
                 "defaultValue": None}
-        arg2 = {"name": "shuffle",
-                "type": "Boolean",
-                "description": "A boolean indicating whether shuffling enabled for the coalesce process",
-                "optional": True,
-                "defaultValue": False}
+        arg2 = {"name": "frame2",
+                "type": "DynamicFrame",
+                "description": "Second DynamicFrame to union.",
+                "optional": False,
+                "defaultValue": None}
         arg3 = {"name": "transformation_ctx",
                 "type": "String",
                 "description": "A unique string that is used to identify stats / state information",
@@ -54,7 +54,7 @@ class Coalesce(GlueTransform):
 
     @classmethod
     def describeTransform(cls):
-        return "Coalesces a DynamicFrame."
+        return "Union two DynamicFrames."
 
     @classmethod
     def describeErrors(cls):
@@ -63,4 +63,4 @@ class Coalesce(GlueTransform):
     @classmethod
     def describeReturn(cls):
         return {"type": "DynamicFrame",
-                "description": "The coalesced DynamicFrame."}
+                "description": "DynamicFrame containing all records from both input DynamicFrames."}

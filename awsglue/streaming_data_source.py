@@ -10,6 +10,19 @@
 # or implied. See the License for the specific language governing
 # permissions and limitations under the License.
 
-from .dynamicframe import DynamicFrame
+from awsglue.utils import makeOptions, callsite
+from pyspark.sql import DataFrame
 
-__all__ = ['DynamicFrame']
+class StreamingDataSource(object):
+    def __init__(self, j_source, sql_ctx, name):
+        self._jsource = j_source
+        self._sql_ctx = sql_ctx
+        self.name = name
+
+    def setFormat(self, format, **options):
+        options["callSite"] = callsite()
+        self._jsource.setFormat(format, makeOptions(self._sql_ctx._sc, options))
+
+    def getFrame(self):
+        jdf = self._jsource.getDataFrame()
+        return DataFrame(jdf, self._sql_ctx)

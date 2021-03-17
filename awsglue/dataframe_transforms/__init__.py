@@ -10,6 +10,8 @@
 # or implied. See the License for the specific language governing
 # permissions and limitations under the License.
 
-from .dynamicframe import DynamicFrame
+from .apply_mapping import ApplyMapping
 
-__all__ = ['DynamicFrame']
+ALL_TRANSFORMS = {ApplyMapping}
+
+__all__ = [transform.__name__ for transform in ALL_TRANSFORMS]
