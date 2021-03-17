@@ -29,10 +29,6 @@ class Job:
     @classmethod
     def encryption_type_options(cls):
         return [ '--encryption-type' , 'sse-s3' ]
-
-    @classmethod
-    def data_lineage_options(cls):
-        return [ '--enable-data-lineage']
     
     def __init__(self, glue_context):
         self._job = glue_context._jvm.Job

@@ -15,8 +15,7 @@ from awsglue.transforms import DropFields, GlueTransform
 class ApplyMapping(GlueTransform):
     def __call__(self, frame, mappings, case_sensitive = False,
                  transformation_ctx = "", info = "", stageThreshold = 0, totalThreshold = 0):
-        return frame.apply_mapping(mappings, case_sensitive, transformation_ctx,
-                                   info, stageThreshold, totalThreshold)
+        return frame.apply_mapping(mappings, case_sensitive)
 
     @classmethod
     def describeArgs(cls):

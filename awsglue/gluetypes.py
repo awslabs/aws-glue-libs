@@ -11,13 +11,6 @@
 # permissions and limitations under the License.
 
 import json
-import sys
-from awsglue.utils import iteritems
-
-
-if sys.version >= "3":
-    basestring = unicode = str
-
 
 class DataType(object):
     def __init__(self, properties={}):
@@ -53,7 +46,7 @@ class AtomicType(DataType):
 
     @classmethod
     def fromJsonValue(cls, json_value):
-        return cls(**{k: v for k, v in iteritems(json_value)
+        return cls(**{k: v for k, v in json_value.iteritems()
                       if k != "dataType"})
 
 
@@ -85,7 +78,7 @@ class DecimalType(AtomicType):
                                                 self.properties)
 
     def jsonValue(self):
-        return dict(list(super(DecimalType, self).jsonValue().items()) +
+        return dict(super(DecimalType, self).jsonValue().items() +
                     [('precision', self.precision), ('scale', self.scale)])
 
 
@@ -106,7 +99,7 @@ class EnumType(AtomicType):
         return "EnumType([{}], {})".format(options_str, self.properties)
 
     def jsonValue(self):
-        dict(list(super(EnumType, self).jsonValue().items()) +
+        dict(super(EnumType, self).jsonValue().items() +
              [('options', list(self.options))])
 
 
@@ -160,7 +153,7 @@ class ArrayType(DataType):
         return "ArrayType({}, {})".format(self.elementType, self.properties)
 
     def jsonValue(self):
-        return dict(list(super(ArrayType, self).jsonValue().items()) +
+        return dict(super(ArrayType, self).jsonValue().items() +
                     [("elementType", self.elementType.jsonValue())])
 
     @classmethod
@@ -181,7 +174,7 @@ class SetType(DataType):
         return "SetType({}, {})".format(self.elementType, self.properties)
 
     def jsonValue(self):
-        return dict(list(super(SetType, self).jsonValue().items()) +
+        return dict(super(SetType, self).jsonValue().items() +
                     [("elementType", self.elementType.jsonValue())])
 
     @classmethod
@@ -220,7 +213,7 @@ class ChoiceType(DataType):
             self.choices[choice.typeName()] = mergeDataTypes(existing, choice)
 
     def jsonValue(self):
-        return dict(list(super(ChoiceType, self).jsonValue().items()) +
+        return dict(super(ChoiceType, self).jsonValue().items() +
                     [("choices", [v.jsonValue()
                                   for v in self.choices.values()])])
 
@@ -241,7 +234,7 @@ class MapType(DataType):
         return "MapType({}, {})".format(self.valueType, self.properties)
 
     def jsonValue(self):
-        return dict(list(super(MapType, self).jsonValue().items()) +
+        return dict(super(MapType, self).jsonValue().items() +
                     [("valueType", self.valueType.jsonValue())])
 
     @classmethod
@@ -255,13 +248,6 @@ class Field(object):
     def __init__(self, name, dataType, properties={}):
         assert isinstance(dataType, DataType),\
             "dataType should be DataType. Got " + str(dataType.__class__)
-        assert isinstance(name, basestring),\
-            "Field name must be a string. Got " + str(name.__class__)
-
-        # Note this only applies in Python 2.7 if the name is type unicode. In that case
-        # we return a str (bytestring) encoded as utf-8. This is the same behavior as
-        # pyspark.sql.types.StructField. Since we are serializing as utf-8 encoded JSON,
-        # the correct values should be preserved when this gets mapped to Scala.
         if not isinstance(name, str):
             name = name.encode('utf-8')
         self.name = name
@@ -320,7 +306,7 @@ class StructType(DataType):
         return self.field_map[field]
 
     def jsonValue(self):
-        return dict(list(super(StructType, self).jsonValue().items()) +
+        return dict(super(StructType, self).jsonValue().items() +
                     [("fields", [f.jsonValue() for f in self.fields])])
 
     @classmethod
@@ -378,7 +364,7 @@ def _make_choice(s1, s2):
     else:
         right_types = {s2.typeName(): s2}
 
-    for typecode, datatype in iteritems(left_types):
+    for typecode, datatype in left_types.iteritems():
         if typecode in right_types:
             right_types[typecode] = mergeDataTypes(datatype,
                                                    right_types[typecode])
@@ -444,7 +430,7 @@ def _create_dynamic_record(dynamicRecord):
 
 def _revert_to_dict(dynamicRecord):
     if isinstance(dynamicRecord, dict):
-        return {k: _revert_to_dict(v) for k,v in iteritems(dynamicRecord)}
+        return {k: _revert_to_dict(v) for k,v in dynamicRecord.iteritems()}
     elif isinstance(dynamicRecord, list):
         return [_revert_to_dict(v) for v in dynamicRecord]
     else:
@@ -456,3 +442,4 @@ class DynamicRecord(dict):
 
     def __setattr__(self, attr, value):
         self[attr] = value
+

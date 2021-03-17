@@ -13,23 +13,16 @@
 from pyspark.sql import SQLContext
 from pyspark.sql import SparkSession
 from py4j.java_gateway import java_import
-from pyspark.sql.utils import StreamingQueryException
-
 from awsglue.data_source import DataSource
-from awsglue.streaming_data_source import StreamingDataSource
 from awsglue.data_sink import DataSink
-from awsglue.dataframereader import DataFrameReader
 from awsglue.dynamicframe import DynamicFrame, DynamicFrameReader, DynamicFrameWriter, DynamicFrameCollection
 from awsglue.gluetypes import DataType
 from awsglue.utils import makeOptions, callsite
-from pyspark.sql.dataframe import DataFrame
 import pyspark
 import os
 import re
 import uuid
 from py4j.java_gateway import JavaClass
-import time
-import logging
 
 def register(sc):
     java_import(sc._jvm, "com.amazonaws.services.glue.*")
@@ -41,13 +34,7 @@ def register(sc):
     java_import(sc._jvm, "com.amazonaws.services.glue.util.AWSConnectionUtils")
     java_import(sc._jvm, "com.amazonaws.services.glue.util.GluePythonUtils")
     java_import(sc._jvm, "com.amazonaws.services.glue.errors.CallSite")
-    java_import(sc._jvm, "com.amazonaws.services.glue.ml.FindMatches")
-    java_import(sc._jvm, "com.amazonaws.services.glue.ml.FindIncrementalMatches")
-    java_import(sc._jvm, "com.amazonaws.services.glue.ml.FillMissingValues")
 
-STREAMING_EXCEPTION_BACKOFF = 12
-STREAMING_EXCEPTION_INTERVAL = 120000
-STREAMING_EXCEPTION_MAX_RETRIES_WITHIN_INTERVAL = 10
 
 class GlueContext(SQLContext):
     Spark_SQL_Formats = {"parquet", "orc"}
@@ -57,7 +44,6 @@ class GlueContext(SQLContext):
         register(sparkContext)
         self._glue_scala_context = self._get_glue_scala_context(**options)
         self.create_dynamic_frame = DynamicFrameReader(self)
-        self.create_data_frame = DataFrameReader(self)
         self.write_dynamic_frame = DynamicFrameWriter(self)
         self.spark_session = SparkSession(sparkContext, self._glue_scala_context.getSparkSession())
         self._glue_logger = sparkContext._jvm.GlueLogger()
@@ -154,38 +140,6 @@ class GlueContext(SQLContext):
                             self, table_name)
         return source.getFrame(**kwargs)
 
-    def create_data_frame_from_catalog(self, database = None, table_name = None, redshift_tmp_dir = "",
-                                          transformation_ctx = "", push_down_predicate="", additional_options = {},
-                                          catalog_id = None, **kwargs):
-        """
-        Creates a DataFrame with catalog database, table name and an optional catalog id
-        :param database: database in catalog
-        :param table_name: table name
-        :param redshift_tmp_dir: tmp dir
-        :param transformation_ctx: transformation context
-        :param push_down_predicate
-        :param additional_options
-        :param catalog_id catalog id of the DataCatalog being accessed (account id of the data catalog).
-                Set to None by default (None defaults to the catalog id of the calling account in the service)
-        :return: data frame with potential errors
-        """
-        if database is not None and "name_space" in kwargs:
-            raise Exception("Parameter name_space and database are both specified, choose one.")
-        elif database is None and "name_space" not in kwargs:
-            raise Exception("Parameter name_space or database is missing.")
-        elif "name_space" in kwargs:
-            db = kwargs.pop("name_space")
-        else:
-            db = database
-
-        if table_name is None:
-            raise Exception("Parameter table_name is missing.")
-        source = StreamingDataSource(self._ssql_ctx.getCatalogSource(db, table_name, redshift_tmp_dir, transformation_ctx,
-                                                            push_down_predicate,
-                                                            makeOptions(self._sc, additional_options), catalog_id),
-                            self, table_name)
-        return source.getFrame()
-
     def create_dynamic_frame_from_options(self, connection_type, connection_options={},
                                           format=None, format_options={}, transformation_ctx = "", push_down_predicate= "",  **kwargs):
         """Creates a DynamicFrame with the specified connection and format.
@@ -245,7 +199,7 @@ class GlueContext(SQLContext):
                            connection_options={}, format={}, format_options={},
                            transformation_ctx = "", **kwargs):
         if isinstance(frame_or_dfc, DynamicFrameCollection):
-            new_options = dict(list(connection_options.items())
+            new_options = dict(connection_options.items()
                                + [("useFrameName", True)])
         elif isinstance(frame_or_dfc, DynamicFrame):
             new_options = connection_options
@@ -315,7 +269,7 @@ class GlueContext(SQLContext):
     def write_from_jdbc_conf(self, frame_or_dfc, catalog_connection, connection_options={},
                              redshift_tmp_dir = "", transformation_ctx = "", catalog_id = None):
         if isinstance(frame_or_dfc, DynamicFrameCollection):
-            new_options = dict(list(connection_options.items())
+            new_options = dict(connection_options.items()
                                + [("useFrameName", True)])
         elif isinstance(frame_or_dfc, DynamicFrame):
             new_options = connection_options
@@ -439,79 +393,3 @@ class GlueContext(SQLContext):
 
     def get_logger(self):
         return self._glue_logger
-
-    def currentTimeMillis(self):
-        return int(round(time.time() * 1000))
-
-    def forEachBatch(self, frame, batch_function, options = {}):
-        if "windowSize" not in options:
-            raise Exception("Missing windowSize argument")
-        if "checkpointLocation" not in options:
-            raise Exception("Missing checkpointLocation argument")
-
-        windowSize = options["windowSize"]
-        checkpointLocation = options["checkpointLocation"]
-
-        # Check the Glue version
-        glue_ver = self.getConf('spark.glue.GLUE_VERSION', '')
-
-        # Converting the S3 scheme to S3a for the Glue Streaming checkpoint location in connector jars.
-        # S3 scheme on checkpointLocation currently doesn't work on Glue 2.0 (non-EMR).
-        # Will remove this once the connector package is imported as brazil package.
-        if (glue_ver == '2.0' or glue_ver == '2'):
-            if (checkpointLocation.startswith( 's3://' )):
-                java_import(self._jvm, "com.amazonaws.regions.RegionUtils")
-                java_import(self._jvm, "com.amazonaws.services.s3.AmazonS3")
-                self._jsc.hadoopConfiguration().set("fs.s3a.endpoint", self._jvm.RegionUtils.getRegion(
-                    self._jvm.AWSConnectionUtils.getRegion()).getServiceEndpoint(self._jvm.AmazonS3.ENDPOINT_PREFIX))
-                checkpointLocation = checkpointLocation.replace( 's3://', 's3a://', 1)
-
-        def batch_function_with_persist(data_frame, batchId):
-            if "persistDataFrame" in options and options["persistDataFrame"].lower() == "true":
-                storage_level = options.get("storageLevel", "MEMORY_AND_DISK").upper()
-                data_frame.persist(getattr(pyspark.StorageLevel, storage_level))
-                batch_function(data_frame, batchId)
-                data_frame.unpersist()
-            else:
-                batch_function(data_frame, batchId)
-
-        query = frame.writeStream.foreachBatch(batch_function_with_persist).trigger(processingTime=windowSize).option("checkpointLocation", checkpointLocation)
-
-        attempts = 0
-        lastFailedAttempt = self.currentTimeMillis()
-
-        while (True):
-            attempts += 1
-            try:
-                query.start().awaitTermination()
-            except StreamingQueryException as e:
-                failedTime = self.currentTimeMillis()
-                if (failedTime - lastFailedAttempt > STREAMING_EXCEPTION_INTERVAL):
-                    attempts = 1
-                    logging.warning("Time since last failure is longer than streaming time interval, resetting retry attempts counter to zero")
-                logging.warning("StreamingQueryException caught. Retry number " + str(attempts))
-
-                if (attempts >= STREAMING_EXCEPTION_MAX_RETRIES_WITHIN_INTERVAL):
-                    logging.error("Exceeded maximuim number of retries in streaming interval, exception thrown")
-                    raise e
-                lastFailedAttempt = failedTime
-                time.sleep(STREAMING_EXCEPTION_BACKOFF)
-
-    """
-        Appends ingestion time columns like ingest_year, ingest_month, ingest_day, ingest_hour, ingest_minute to the
-        input DataFrame.
-        :param df Input DataFrame in which to append the ingestion time columns.
-        :param timeGranularity Time Granularity until which to add the time granularity columns.
-        :return DataFrame after appending the time granularity columns.  
-    """
-    def add_ingestion_time_columns(self, frame, time_granularity):
-        return DataFrame(self._ssql_ctx.addIngestionTimeColumns(frame._jdf, time_granularity), frame.sql_ctx)
-
-    def begin_transaction(self, read_only):
-        return self._ssql_ctx.beginTransaction(read_only)
-
-    def commit_transaction(self, transaction_id):
-        return self._ssql_ctx.commitTransaction(transaction_id)
-
-    def abort_transaction(self, transaction_id):
-        return self._ssql_ctx.abortTransaction(transaction_id)

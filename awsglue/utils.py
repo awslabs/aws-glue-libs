@@ -14,7 +14,7 @@ import argparse
 import json
 import traceback
 import sys
-from awsglue.job import Job
+from job import Job
 
 _global_args = {}
 
@@ -48,22 +48,6 @@ def _as_resolve_choiceOption(sc, choice_option_str):
 def callsite():
     return "".join(traceback.format_list(traceback.extract_stack()[:-2]))
 
-
-# Definitions for Python 2/Python 3
-if sys.version >= "3":
-    def iteritems(d, **kwargs):
-        return iter(d.items(**kwargs))
-    def iterkeys(d, **kwargs):
-        return iter(d.values(**kwargs))
-    def itervalues(d, **kwargs):
-        return iter(d.values(**kwargs))
-else:
-    def iteritems(d, **kwargs):
-        return d.iteritems(**kwargs)
-    def iterkeys(d, **kwargs):
-        return d.iterkeys(**kwargs)
-    def itervalues(d, **kwargs):
-        return d.itervalues(**kwargs)
 
 class GlueArgumentError(Exception):
     pass
@@ -102,10 +86,6 @@ def getResolvedOptions(args, options):
     if Job.encryption_type_options()[0] in options:
         raise RuntimeError("Using reserved arguments " + Job.encryption_type_options()[0])
     parser.add_argument(Job.encryption_type_options()[0], choices = Job.encryption_type_options()[1:])
-
-    if Job.data_lineage_options()[0] in options:
-        raise RuntimeError("Using reserved arguments " + Job.data_lineage_options()[0])
-    parser.add_argument(Job.data_lineage_options()[0], required=False)
         
     # TODO: Remove special handling for 'RedshiftTempDir' and 'TempDir' after TempDir is made mandatory for all Jobs
     # Remove 'RedshiftTempDir' and 'TempDir' from list of user supplied options

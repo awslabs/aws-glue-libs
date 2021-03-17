@@ -10,7 +10,6 @@
 # or implied. See the License for the specific language governing
 # permissions and limitations under the License.
 
-from __future__ import print_function
 from awsglue.transforms import DropFields, GlueTransform
 from awsglue.gluetypes import ArrayType, NullType, StructType
 
@@ -36,7 +35,7 @@ class DropNullFields(GlueTransform):
     def __call__(self, frame, transformation_ctx = "", info = "", stageThreshold = 0, totalThreshold = 0):
         null_fields = []
         self._find_null_fields(frame.glue_ctx, frame.schema(), "", null_fields)
-        print("null_fields", null_fields)
+        print "null_fields", null_fields
 
         return DropFields.apply(frame, null_fields, transformation_ctx,
                                 info, stageThreshold, totalThreshold)
