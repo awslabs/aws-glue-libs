@@ -22,6 +22,8 @@ above spark archive.
 Glue version 0.9: export SPARK_HOME=/home/$USER/spark-2.2.1-bin-hadoop2.7
 Glue version 1.0: export SPARK_HOME=/home/$USER/spark-2.4.3-bin-spark-2.4.3-bin-hadoop2.8
 
+Download the aws-glue-libs module, for version 0.9 checkout the master branch and for version 1.0 checkout the glue-1.0 branch
+
 The gluepytest script assumes that the pytest module is installed and available in the PATH
 
 Glue shell: ./bin/gluepyspark
