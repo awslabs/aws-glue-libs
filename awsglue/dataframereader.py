@@ -9,7 +9,7 @@
 # on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, express
 # or implied. See the License for the specific language governing
 # permissions and limitations under the License.
-
+ 
 class DataFrameReader(object):
     def __init__(self, glue_context):
         self._glue_context = glue_context
@@ -30,3 +30,12 @@ class DataFrameReader(object):
             raise Exception("Parameter table_name is missing.")
 
         return self._glue_context.create_data_frame_from_catalog(db, table_name, redshift_tmp_dir, transformation_ctx, push_down_predicate, additional_options, catalog_id, **kwargs)
+
+    def from_options(self, connection_type, connection_options={},
+                     format=None, format_options={}, transformation_ctx="", push_down_predicate = "", **kwargs):
+        """Creates a DataFrame with the specified connection and format.
+        """
+        return self._glue_context.create_data_frame_from_options(connection_type,
+                                                                    connection_options,
+                                                                    format,
+                                                                    format_options, transformation_ctx, push_down_predicate, **kwargs)

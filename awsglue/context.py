@@ -41,13 +41,10 @@ def register(sc):
     java_import(sc._jvm, "com.amazonaws.services.glue.util.AWSConnectionUtils")
     java_import(sc._jvm, "com.amazonaws.services.glue.util.GluePythonUtils")
     java_import(sc._jvm, "com.amazonaws.services.glue.errors.CallSite")
-    java_import(sc._jvm, "com.amazonaws.services.glue.ml.FindMatches")
-    java_import(sc._jvm, "com.amazonaws.services.glue.ml.FindIncrementalMatches")
-    java_import(sc._jvm, "com.amazonaws.services.glue.ml.FillMissingValues")
+    # java_import(sc._jvm, "com.amazonaws.services.glue.ml.FindMatches")
+    # java_import(sc._jvm, "com.amazonaws.services.glue.ml.FindIncrementalMatches")
+    # java_import(sc._jvm, "com.amazonaws.services.glue.ml.FillMissingValues")
 
-STREAMING_EXCEPTION_BACKOFF = 12
-STREAMING_EXCEPTION_INTERVAL = 120000
-STREAMING_EXCEPTION_MAX_RETRIES_WITHIN_INTERVAL = 10
 
 class GlueContext(SQLContext):
     Spark_SQL_Formats = {"parquet", "orc"}
@@ -112,6 +109,33 @@ class GlueContext(SQLContext):
             prefix = re.sub('[-]', '_', prefix)
 
         return DataSource(j_source, self, prefix)
+
+    def getStreamingSource(self, connection_type, format = None, transformation_ctx = "", push_down_predicate= "", **options):
+        """Creates a Streaming Data Source object.
+
+        This can be used to read Dataframes from external sources.
+        """
+        options["callSite"] = callsite()
+        if(format and format.lower() in self.Spark_SQL_Formats):
+            connection_type = format
+
+        j_source = self._ssql_ctx.getSource(connection_type,
+                                            makeOptions(self._sc, options), transformation_ctx, push_down_predicate)
+
+        prefix = None
+        if 'paths' in options and options['paths'] != None:
+            paths = options['paths']
+            prefix = os.path.commonprefix(paths)
+            if prefix != None:
+                prefix = prefix.split(':')[-1]
+                prefix = re.sub('[:/.]', '', prefix)
+
+        # in case paths is not in options or no common prefix
+        if prefix == None:
+            prefix = str(uuid.uuid1())
+            prefix = re.sub('[-]', '_', prefix)
+
+        return StreamingDataSource(j_source, self, prefix)
 
     def get_catalog_schema_as_spark_schema(self, database = None, table_name = None, catalog_id = None):
         return self._ssql_ctx.getCatalogSchemaAsSparkSchema(database, table_name, catalog_id)
@@ -202,6 +226,17 @@ class GlueContext(SQLContext):
             source.setFormat(format, **format_options)
 
         return source.getFrame(**kwargs)
+
+    def create_data_frame_from_options(self, connection_type, connection_options={},
+                                       format=None, format_options={}, transformation_ctx = "", push_down_predicate= "",  **kwargs):
+        """Creates a DataFrame with the specified connection and format. Used for streaming data sources
+        """
+        source = self.getStreamingSource(connection_type, format, transformation_ctx, push_down_predicate, **connection_options)
+
+        if (format and format not in self.Spark_SQL_Formats):
+            source.setFormat(format, **format_options)
+
+        return source.getFrame()
 
     def getSink(self, connection_type, format = None, transformation_ctx = "", **options):
         """Gets a DataSink object.
@@ -454,11 +489,12 @@ class GlueContext(SQLContext):
 
         # Check the Glue version
         glue_ver = self.getConf('spark.glue.GLUE_VERSION', '')
+        java_import(self._jvm, "org.apache.spark.metrics.source.StreamingSource")
 
         # Converting the S3 scheme to S3a for the Glue Streaming checkpoint location in connector jars.
         # S3 scheme on checkpointLocation currently doesn't work on Glue 2.0 (non-EMR).
         # Will remove this once the connector package is imported as brazil package.
-        if (glue_ver == '2.0' or glue_ver == '2'):
+        if (glue_ver == '2.0' or glue_ver == '2' or glue_ver == '3.0' or glue_ver == '3'):
             if (checkpointLocation.startswith( 's3://' )):
                 java_import(self._jvm, "com.amazonaws.regions.RegionUtils")
                 java_import(self._jvm, "com.amazonaws.services.s3.AmazonS3")
@@ -466,36 +502,53 @@ class GlueContext(SQLContext):
                     self._jvm.AWSConnectionUtils.getRegion()).getServiceEndpoint(self._jvm.AmazonS3.ENDPOINT_PREFIX))
                 checkpointLocation = checkpointLocation.replace( 's3://', 's3a://', 1)
 
+        run = {'value': 0}
+        retry_attempt = {'value': 0}
+
         def batch_function_with_persist(data_frame, batchId):
-            if "persistDataFrame" in options and options["persistDataFrame"].lower() == "true":
+
+            # This condition is true when the previous batch succeeded
+            if run['value'] > retry_attempt['value']:
+                run['value'] = 0
+                if retry_attempt['value'] > 0:
+                    retry_attempt['value'] = 0
+                    logging.warning("The batch is now succeeded. Resetting retry attempt counter to zero.")
+            run['value'] += 1
+
+            # process the batch
+            startTime = self.currentTimeMillis()
+            if "persistDataFrame" in options and options["persistDataFrame"].lower() == "false":
+                if len(data_frame.take(1)):
+                    batch_function(data_frame, batchId)
+            else:
                 storage_level = options.get("storageLevel", "MEMORY_AND_DISK").upper()
                 data_frame.persist(getattr(pyspark.StorageLevel, storage_level))
-                batch_function(data_frame, batchId)
+                num_records = data_frame.count()
+                if num_records > 0:
+                    batch_function(data_frame, batchId)
                 data_frame.unpersist()
-            else:
-                batch_function(data_frame, batchId)
+                self._jvm.StreamingSource.updateNumRecords(num_records)
+            self._jvm.StreamingSource.updateBatchProcessingTimeInMs(self.currentTimeMillis() - startTime)
 
         query = frame.writeStream.foreachBatch(batch_function_with_persist).trigger(processingTime=windowSize).option("checkpointLocation", checkpointLocation)
 
-        attempts = 0
-        lastFailedAttempt = self.currentTimeMillis()
+        batch_max_retries = int(options.get('batchMaxRetries', 3))
+        if batch_max_retries < 0 or batch_max_retries > 100:
+            raise ValueError('Please specify the number of retries as an integer in the range of [0, 100].')
 
         while (True):
-            attempts += 1
             try:
                 query.start().awaitTermination()
-            except StreamingQueryException as e:
-                failedTime = self.currentTimeMillis()
-                if (failedTime - lastFailedAttempt > STREAMING_EXCEPTION_INTERVAL):
-                    attempts = 1
-                    logging.warning("Time since last failure is longer than streaming time interval, resetting retry attempts counter to zero")
-                logging.warning("StreamingQueryException caught. Retry number " + str(attempts))
+            except Exception as e:
+                retry_attempt['value'] += 1
+                logging.warning("StreamingQueryException caught. Retry number " + str(retry_attempt['value']))
 
-                if (attempts >= STREAMING_EXCEPTION_MAX_RETRIES_WITHIN_INTERVAL):
+                if retry_attempt['value'] > batch_max_retries:
                     logging.error("Exceeded maximuim number of retries in streaming interval, exception thrown")
                     raise e
-                lastFailedAttempt = failedTime
-                time.sleep(STREAMING_EXCEPTION_BACKOFF)
+                # lastFailedAttempt = failedTime
+                backOffTime = retry_attempt['value'] if (retry_attempt['value'] < 3) else 5
+                time.sleep(backOffTime)
 
     """
         Appends ingestion time columns like ingest_year, ingest_month, ingest_day, ingest_hour, ingest_minute to the
