@@ -52,8 +52,6 @@ The `awsglue` library provides only the Python interface to the Glue Spark runti
 
 The libraries in this repository licensed under the [Amazon Software License](http://aws.amazon.com/asl/) (the "License"). They may not be used except in compliance with the License, a copy of which is included here in the LICENSE file.
 
-<<<<<<< HEAD
-=======
 ---
 
 # Release Notes
@@ -67,4 +65,3 @@ git branch -u origin/glue-0.9 glue-0.9
 git remote set-head origin -a
 ```
 
->>>>>>> db8d716... Update README with more release information, branch switching, and a glue-python versions table
