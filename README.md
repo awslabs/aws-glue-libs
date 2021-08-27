@@ -9,14 +9,14 @@ This repository contains:
 
 ## Python versions by Glue Version
 
-Different Glue versions support different Python versions, the following table below is for your reference.
+Different Glue versions support different Python versions. The following table below is for your reference, which also includes the associated repository's branch for each glue version.
 
-| Glue Version  | Python 2 Version  | Python 3 Version  |
-|---|---|---|
-| 0.9  | 2.7  | Not supported |
-| 1.0  | 2.7  | 3.6  |
-| 2.0  |  Not supported | 3.7  |
-| 3.0  | Not supported  | 3.7  |
+| Glue Version  | Python 2 Version  | Python 3 Version  | aws-glue-libs branch|
+|---|---|---| --- |
+| 0.9  | 2.7  | Not supported | glue-0.9 |
+| 1.0  | 2.7  | 3.6  | glue-1.0 |
+| 2.0  |  Not supported | 3.7  | glue-2.0 |
+| 3.0  | Not supported  | 3.7  | master |
 
 You may refer to AWS Glue's official [release notes](https://docs.aws.amazon.com/glue/latest/dg/release-notes.html) for more information
 
