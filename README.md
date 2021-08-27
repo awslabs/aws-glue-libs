@@ -1,8 +1,24 @@
 # aws-glue-libs
+
+This repository supports python libraries for local development of glue pyspark batch jobs. Glue streaming is not supported with this library.
+
+## Contents
 This repository contains:
  * `awsglue` - the Python libary you can use to author [AWS Glue](https://aws.amazon.com/glue) ETL job. This library extends [Apache Spark](https://spark.apache.org/) with additional data types and operations for ETL workflows. It's an interface for Glue ETL library in Python.
  * `bin` - this directory hosts several executables that allow you to run the Python library locally or open up a PySpark shell to run Glue Spark code interactively.
 
+## Python versions by Glue Version
+
+Different Glue versions support different Python versions, the following table below is for your reference.
+
+| Glue Version  | Python 2 Version  | Python 3 Version  |
+|---|---|---|
+| 0.9  | 2.7  | Not supported |
+| 1.0  | 2.7  | 3.6  |
+| 2.0  |  Not supported | 3.7  |
+| 3.0  | Not supported  | 3.7  |
+
+You may refer to AWS Glue's official [release notes](https://docs.aws.amazon.com/glue/latest/dg/release-notes.html) for more information
 
 ## Setup guide
 
@@ -35,3 +51,17 @@ The `awsglue` library provides only the Python interface to the Glue Spark runti
 ## Licensing
 
 The libraries in this repository licensed under the [Amazon Software License](http://aws.amazon.com/asl/) (the "License"). They may not be used except in compliance with the License, a copy of which is included here in the LICENSE file.
+
+---
+
+# Release Notes
+
+## August 27 2021
+* The master branch has been modified from representing Glue 0.9 to Glue 3.0, we have also created a glue-0.9 branch to reflect the former state of the master branch with Glue 0.9. To rename your local clone of the older master branch and point to the glue-0.9 branch, you may use the following commands:
+```
+git branch -m master glue-0.9
+git fetch origin
+git branch -u origin/glue-0.9 glue-0.9
+git remote set-head origin -a
+```
+
