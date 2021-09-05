@@ -395,10 +395,10 @@ class DynamicFrame(object):
             return self.glue_ctx._jvm.ResolveSpec.apply(path, action)
 
         if specs is None and not choice:
-            raise Exception("Parameter specs and option are both missing, add one.")
+            raise Exception("Parameter specs and choice are both missing, add one.")
 
         if specs is not None and choice:
-            raise Exception("Parameter specs and option are both specified, choose one.")
+            raise Exception("Parameter specs and choice are both specified, choose one.")
 
         if specs is None:
             specs = []
