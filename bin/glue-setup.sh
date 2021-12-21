@@ -22,8 +22,8 @@ export SPARK_CONF_DIR=${ROOT_DIR}/conf
 mkdir $SPARK_CONF_DIR
 rm $SPARK_CONF_DIR/spark-defaults.conf
 # Generate spark-defaults.conf
-echo "spark.driver.extraClassPath $GLUE_JARS_DIR/*" >> $SPARK_CONF_DIR/spark-defaults.conf
-echo "spark.executor.extraClassPath $GLUE_JARS_DIR/*" >> $SPARK_CONF_DIR/spark-defaults.conf
+echo "spark.driver.extraClassPath $SPARK_HOME/jars/*:$GLUE_JARS_DIR/*" >> $SPARK_CONF_DIR/spark-defaults.conf
+echo "spark.executor.extraClassPath $SPARK_HOME/jars/*:$GLUE_JARS_DIR/*" >> $SPARK_CONF_DIR/spark-defaults.conf
 
 # Restore present working directory
 cd -
