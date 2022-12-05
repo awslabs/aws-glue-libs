@@ -19,6 +19,7 @@ from awsglue.data_source import DataSource
 from awsglue.streaming_data_source import StreamingDataSource
 from awsglue.data_sink import DataSink
 from awsglue.dataframereader import DataFrameReader
+from awsglue.dataframewriter import DataFrameWriter
 from awsglue.dynamicframe import DynamicFrame, DynamicFrameReader, DynamicFrameWriter, DynamicFrameCollection
 from awsglue.gluetypes import DataType
 from awsglue.utils import makeOptions, callsite
@@ -41,6 +42,8 @@ def register(sc):
     java_import(sc._jvm, "com.amazonaws.services.glue.util.AWSConnectionUtils")
     java_import(sc._jvm, "com.amazonaws.services.glue.util.GluePythonUtils")
     java_import(sc._jvm, "com.amazonaws.services.glue.errors.CallSite")
+    java_import(sc._jvm, "com.amazonaws.services.glue.ml.EntityDetector")
+    java_import(sc._jvm, "com.amazonaws.services.glue.dq.EvaluateDataQuality")
     # java_import(sc._jvm, "com.amazonaws.services.glue.ml.FindMatches")
     # java_import(sc._jvm, "com.amazonaws.services.glue.ml.FindIncrementalMatches")
     # java_import(sc._jvm, "com.amazonaws.services.glue.ml.FillMissingValues")
@@ -48,6 +51,7 @@ def register(sc):
 
 class GlueContext(SQLContext):
     Spark_SQL_Formats = {"parquet", "orc"}
+    Unsupported_Compression_Types = {"lzo"}
 
     def __init__(self, sparkContext, **options):
         super(GlueContext, self).__init__(sparkContext)
@@ -56,6 +60,7 @@ class GlueContext(SQLContext):
         self.create_dynamic_frame = DynamicFrameReader(self)
         self.create_data_frame = DataFrameReader(self)
         self.write_dynamic_frame = DynamicFrameWriter(self)
+        self.write_data_frame = DataFrameWriter(self)
         self.spark_session = SparkSession(sparkContext, self._glue_scala_context.getSparkSession())
         self._glue_logger = sparkContext._jvm.GlueLogger()
 
@@ -89,7 +94,11 @@ class GlueContext(SQLContext):
         >>> myFrame = data_source.getFrame()
         """
         options["callSite"] = callsite()
-        if(format and format.lower() in self.Spark_SQL_Formats):
+        compressionType = options.get("compressionType", "")
+        if compressionType in self.Unsupported_Compression_Types and format == None:
+            raise Exception("When using compressionType {}, the format parameter must be specified.".format(compressionType))
+        #if get unsupported compression type, fallback to use spark sql datasource.
+        if((format and format.lower() in self.Spark_SQL_Formats) or (compressionType in self.Unsupported_Compression_Types)):
             connection_type = format
 
         j_source = self._ssql_ctx.getSource(connection_type,
@@ -222,10 +231,55 @@ class GlueContext(SQLContext):
         """
         source = self.getSource(connection_type, format, transformation_ctx, push_down_predicate, **connection_options)
 
-        if (format and format not in self.Spark_SQL_Formats):
+        if (format and format not in self.Spark_SQL_Formats and connection_options.get("compressionType", "") not in self.Unsupported_Compression_Types):
             source.setFormat(format, **format_options)
 
         return source.getFrame(**kwargs)
+
+    def create_sample_dynamic_frame_from_catalog(self, database = None, table_name = None, num = None, sample_options = {}, redshift_tmp_dir = "",
+                                          transformation_ctx = "", push_down_predicate="", additional_options = {},
+                                          catalog_id = None, erieTxId = "", asOfTime = "", **kwargs):
+        """
+        return a list of sample dynamic records with catalog database, table name and an optional catalog id
+        :param database: database in catalog
+        :param table_name: table name
+        :param num: number of sample records
+        :param sample_options: options for sampling behavior
+        :param transformation_ctx: transformation context
+        :param push_down_predicate
+        :param additional_options
+        :param catalog_id catalog id of the DataCatalog being accessed (account id of the data catalog).
+                Set to None by default (None defaults to the catalog id of the calling account in the service)
+        :return: dynamic frame with potential errors
+        """
+        if database is not None and "name_space" in kwargs:
+            raise Exception("Parameter name_space and database are both specified, choose one.")
+        elif database is None and "name_space" not in kwargs:
+            raise Exception("Parameter name_space or database is missing.")
+        elif "name_space" in kwargs:
+            db = kwargs.pop("name_space")
+        else:
+            db = database
+
+        if table_name is None:
+            raise Exception("Parameter table_name is missing.")
+        source = DataSource(self._ssql_ctx.getCatalogSource(db, table_name, redshift_tmp_dir, transformation_ctx,
+                                                            push_down_predicate,
+                                                            makeOptions(self._sc, additional_options), catalog_id),
+                            self, table_name)
+        return source.getSampleFrame(num, **sample_options)
+
+    def create_sample_dynamic_frame_from_options(self, connection_type, connection_options={}, num = None, sample_options = {},
+                                          format=None, format_options={}, transformation_ctx = "", push_down_predicate= "", **kwargs):
+        """Creates a list of sample dynamic records with the specified connection and format.
+        """
+        source = self.getSource(connection_type, format, transformation_ctx, push_down_predicate, **connection_options)
+
+        if (format and format not in self.Spark_SQL_Formats):
+            source.setFormat(format, **format_options)
+
+        return source.getSampleFrame(num, **sample_options)
+
 
     def create_data_frame_from_options(self, connection_type, connection_options={},
                                        format=None, format_options={}, transformation_ctx = "", push_down_predicate= "",  **kwargs):
@@ -331,6 +385,24 @@ class GlueContext(SQLContext):
         j_sink = self._ssql_ctx.getCatalogSink(db, table_name, redshift_tmp_dir, transformation_ctx,
                                                makeOptions(self._sc, additional_options), catalog_id)
         return DataSink(j_sink, self).write(frame)
+
+    def write_data_frame_from_catalog(self, frame, database = None, table_name = None, redshift_tmp_dir = "",
+                                         transformation_ctx = "", additional_options = {}, catalog_id = None, **kwargs):
+        if database is not None and "name_space" in kwargs:
+            raise Exception("Parameter name_space and database are both specified, choose one.")
+        elif database is None and "name_space" not in kwargs:
+            raise Exception("Parameter name_space or database is missing.")
+        elif "name_space" in kwargs:
+            db = kwargs.pop("name_space")
+        else:
+            db = database
+
+        if table_name is None:
+            raise Exception("Parameter table_name is missing.")
+
+        j_sink = self._ssql_ctx.getCatalogSink(db, table_name, redshift_tmp_dir, transformation_ctx,
+                                               makeOptions(self._sc, additional_options), catalog_id)
+        return DataSink(j_sink, self).writeDataFrame(frame, self)
 
     def write_dynamic_frame_from_jdbc_conf(self, frame, catalog_connection, connection_options={},
                                            redshift_tmp_dir = "", transformation_ctx = "", catalog_id = None):
@@ -478,6 +550,55 @@ class GlueContext(SQLContext):
     def currentTimeMillis(self):
         return int(round(time.time() * 1000))
 
+    def getSampleStreamingDynamicFrame(self, frame, options={}, batch_function=None):
+        if "windowSize" not in options:
+            raise ValueError("Missing windowSize argument")
+
+        windowSize = options["windowSize"]
+        pollingTimeInMs = int(options.get("pollingTimeInMs", 10000))
+        recordPollingLimit = int(options.get("recordPollingLimit", 100))
+
+        # Use a different implementation here due to Py4J limitation
+        def convert_window_size_to_milis(window_size):
+            if type(window_size) != str or " " not in window_size.strip():
+                raise ValueError("Received invalid window size")
+            chunks = window_size.strip().split(" ")
+            if len(chunks) != 2:
+                raise ValueError("Received invalid window size")
+            unit = chunks[1].lower()
+            if "second" in unit:
+                multiplier = 1000
+            elif "minute" in unit:
+                multiplier = 1000 * 60
+            elif "hour" in unit:
+                multiplier = 1000 * 60 * 60
+            else:
+                raise ValueError("Received invalid window size")
+            try:
+                quantity = int(chunks[0])
+            except:
+                raise ValueError("Received invalid window size")
+            return quantity * multiplier
+
+        windowSizeInMilis = convert_window_size_to_milis(windowSize)
+        if windowSizeInMilis >= pollingTimeInMs:
+            raise ValueError("Polling time needs to be larger than window size")
+
+        tableId = str(uuid.uuid4()).replace("-", "")
+        writer = frame.writeStream\
+            .trigger(processingTime=windowSize)\
+            .queryName(tableId)\
+            .format("memory")
+        if batch_function is not None:
+            writer = writer.foreachBatch(batch_function)
+
+        query = writer.start()
+        resultDF = self.spark_session.sql("select * from " + tableId + " limit " + str(recordPollingLimit))
+        time.sleep(pollingTimeInMs / 1000)
+        query.stop()
+        return DynamicFrame.fromDF(resultDF, self, tableId)
+
+
     def forEachBatch(self, frame, batch_function, options = {}):
         if "windowSize" not in options:
             raise Exception("Missing windowSize argument")
@@ -487,20 +608,7 @@ class GlueContext(SQLContext):
         windowSize = options["windowSize"]
         checkpointLocation = options["checkpointLocation"]
 
-        # Check the Glue version
-        glue_ver = self.getConf('spark.glue.GLUE_VERSION', '')
         java_import(self._jvm, "org.apache.spark.metrics.source.StreamingSource")
-
-        # Converting the S3 scheme to S3a for the Glue Streaming checkpoint location in connector jars.
-        # S3 scheme on checkpointLocation currently doesn't work on Glue 2.0 (non-EMR).
-        # Will remove this once the connector package is imported as brazil package.
-        if (glue_ver == '2.0' or glue_ver == '2' or glue_ver == '3.0' or glue_ver == '3'):
-            if (checkpointLocation.startswith( 's3://' )):
-                java_import(self._jvm, "com.amazonaws.regions.RegionUtils")
-                java_import(self._jvm, "com.amazonaws.services.s3.AmazonS3")
-                self._jsc.hadoopConfiguration().set("fs.s3a.endpoint", self._jvm.RegionUtils.getRegion(
-                    self._jvm.AWSConnectionUtils.getRegion()).getServiceEndpoint(self._jvm.AmazonS3.ENDPOINT_PREFIX))
-                checkpointLocation = checkpointLocation.replace( 's3://', 's3a://', 1)
 
         run = {'value': 0}
         retry_attempt = {'value': 0}
@@ -512,7 +620,7 @@ class GlueContext(SQLContext):
                 run['value'] = 0
                 if retry_attempt['value'] > 0:
                     retry_attempt['value'] = 0
-                    logging.warning("The batch is now succeeded. Resetting retry attempt counter to zero.")
+                    logging.info("The previous batch was succeeded. Reset the retry attempt counter to 0.")
             run['value'] += 1
 
             # process the batch
@@ -538,15 +646,20 @@ class GlueContext(SQLContext):
 
         while (True):
             try:
+                if retry_attempt['value'] > 0:
+                    logging.warning("Retrying micro batch processing, attempt {} out of {}. ".format(retry_attempt['value'], batch_max_retries))
                 query.start().awaitTermination()
             except Exception as e:
+
+                if str(e).startswith("CheckpointMetadataNotFound"):
+                    raise e
+
                 retry_attempt['value'] += 1
-                logging.warning("StreamingQueryException caught. Retry number " + str(retry_attempt['value']))
 
                 if retry_attempt['value'] > batch_max_retries:
-                    logging.error("Exceeded maximuim number of retries in streaming interval, exception thrown")
+                    self._glue_logger.error("Exceeded the maximum number of batch retries. Throwing the exception. ")
                     raise e
-                # lastFailedAttempt = failedTime
+
                 backOffTime = retry_attempt['value'] if (retry_attempt['value'] < 3) else 5
                 time.sleep(backOffTime)
 
@@ -560,11 +673,11 @@ class GlueContext(SQLContext):
     def add_ingestion_time_columns(self, frame, time_granularity):
         return DataFrame(self._ssql_ctx.addIngestionTimeColumns(frame._jdf, time_granularity), frame.sql_ctx)
 
-    def begin_transaction(self, read_only):
-        return self._ssql_ctx.beginTransaction(read_only)
+    def start_transaction(self, read_only):
+        return self._ssql_ctx.startTransaction(read_only)
 
-    def commit_transaction(self, transaction_id):
-        return self._ssql_ctx.commitTransaction(transaction_id)
+    def commit_transaction(self, transaction_id, wait_for_commit=True):
+        return self._ssql_ctx.commitTransaction(transaction_id, wait_for_commit)
 
-    def abort_transaction(self, transaction_id):
-        return self._ssql_ctx.abortTransaction(transaction_id)
+    def cancel_transaction(self, transaction_id):
+        return self._ssql_ctx.cancelTransaction(transaction_id)

@@ -11,12 +11,13 @@ This repository contains:
 
 Different Glue versions support different Python versions. The following table below is for your reference, which also includes the associated repository's branch for each glue version.
 
-| Glue Version  | Python 2 Version  | Python 3 Version  | aws-glue-libs branch|
-|---|---|---| --- |
-| 0.9  | 2.7  | Not supported | glue-0.9 |
-| 1.0  | 2.7  | 3.6  | glue-1.0 |
-| 2.0  |  Not supported | 3.7  | glue-2.0 |
-| 3.0  | Not supported  | 3.7  | master |
+| Glue Version  | Python 2 Version  | Python 3 Version  | aws-glue-libs branch |
+|---|---|---|----------------------|
+| 0.9  | 2.7  | Not supported | glue-0.9             |
+| 1.0  | 2.7  | 3.6  | glue-1.0             |
+| 2.0  |  Not supported | 3.7  | glue-2.0             |
+| 3.0  | Not supported  | 3.7  | glue-3.0             |
+| 4.0  | Not supported  | 3.10 | master               |
 
 You may refer to AWS Glue's official [release notes](https://docs.aws.amazon.com/glue/latest/dg/release-notes.html) for more information
 
@@ -33,12 +34,14 @@ The `awsglue` library provides only the Python interface to the Glue Spark runti
    * Glue version 1.0: `https://aws-glue-etl-artifacts.s3.amazonaws.com/glue-1.0/spark-2.4.3-bin-hadoop2.8.tgz1`
    * Glue version 2.0: `https://aws-glue-etl-artifacts.s3.amazonaws.com/glue-2.0/spark-2.4.3-bin-hadoop2.8.tgz1`
    * Glue version 3.0: `https://aws-glue-etl-artifacts.s3.amazonaws.com/glue-3.0/spark-3.1.1-amzn-0-bin-3.2.1-amzn-3.tgz`
+   * Glue version 4.0: `https://aws-glue-etl-artifacts.s3.amazonaws.com/glue-4.0/spark-3.3.0-amzn-1-bin-3.3.3-amzn-0.tgz` 
 1. export the `SPARK_HOME` environmental variable to the extracted location of the above Spark distribution. For example:
     ```
     Glue version 0.9: export SPARK_HOME=/home/$USER/spark-2.2.1-bin-hadoop2.7
     Glue version 1.0: export SPARK_HOME=/home/$USER/spark-2.4.3-bin-hadoop2.8
     Glue version 2.0: export SPARK_HOME=/home/$USER/spark-2.4.3-bin-hadoop2.8
     Glue version 3.0: export SPARK_HOME=/home/$USER/spark-3.1.1-amzn-0-bin-3.2.1-amzn-3
+    Glue version 4.0: export SPARK_HOME=/home/$USER/spark-3.3.0-amzn-1-bin-3.3.3-amzn-0
     ```
 1. now you can run the executables in the `bin` directory to start a Glue Shell or submit a Glue Spark application.
     ```

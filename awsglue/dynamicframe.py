@@ -74,10 +74,10 @@ class DynamicFrame(object):
                 raise Exception("Unable to parse datatype from schema. %s" % e)
         return self._schema
 
-    def show(self, num_rows = 20):
-        self._jdf.show(num_rows)
+    def show(self, num_rows=20):
+        print(self._jdf.showString(num_rows))
 
-    def filter(self, f, transformation_ctx = "", info="", stageThreshold=0, totalThreshold=0):
+    def filter(self, f, transformation_ctx="", info="", stageThreshold=0, totalThreshold=0):
         def wrap_dict_with_dynamic_records(x):
                 rec = _create_dynamic_record(x["record"])
                 try:
@@ -385,6 +385,10 @@ class DynamicFrame(object):
             transformation_ctx,
             _call_site(self._sc, callsite(), info), long(stageThreshold), long(totalThreshold))
 
+        return DynamicFrame(new_jdf, self.glue_ctx, self.name)
+
+    def unnest_ddb_json(self, transformation_ctx="", info="", stageThreshold=0, totalThreshold=0):
+        new_jdf = self._jdf.unnestDDBJson(transformation_ctx, _call_site(self._sc, callsite(), info), long(stageThreshold), long(totalThreshold))
         return DynamicFrame(new_jdf, self.glue_ctx, self.name)
 
     def resolveChoice(self, specs=None, choice="", database=None, table_name=None,

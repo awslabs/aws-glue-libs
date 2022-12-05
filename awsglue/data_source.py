@@ -38,3 +38,7 @@ class DataSource(object):
             jframe = self._jsource.getDynamicFrame(minPartitions, targetPartitions)
 
         return DynamicFrame(jframe, self._sql_ctx, self.name)
+
+    def getSampleFrame(self, num, **options):
+        jframe = self._jsource.getSampleDynamicFrame(num, makeOptions(self._sql_ctx._sc, options))
+        return DynamicFrame(jframe, self._sql_ctx, self.name)

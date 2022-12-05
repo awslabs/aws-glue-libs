@@ -12,6 +12,7 @@
 
 from awsglue.dynamicframe import DynamicFrame, DynamicFrameCollection
 from awsglue.utils import makeOptions, callsite
+from pyspark.sql import DataFrame
 
 class DataSink(object):
     def __init__(self, j_sink, sql_ctx):
@@ -29,6 +30,9 @@ class DataSink(object):
 
     def writeFrame(self, dynamic_frame, info = ""):
         return DynamicFrame(self._jsink.pyWriteDynamicFrame(dynamic_frame._jdf, callsite(), info), dynamic_frame.glue_ctx, dynamic_frame.name + "_errors")
+
+    def writeDataFrame(self, data_frame, glue_context, info = ""):
+        return DataFrame(self._jsink.pyWriteDataFrame(data_frame._jdf, glue_context._glue_scala_context, callsite(), info), self._sql_ctx)
 
     def write(self, dynamic_frame_or_dfc, info = ""):
         if isinstance(dynamic_frame_or_dfc, DynamicFrame):
