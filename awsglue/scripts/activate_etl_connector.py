@@ -102,7 +102,7 @@ def extract_registry_id(ecr_root: str) -> str:
     Extract AWS account id of the ECR registry from its root address
     e.g. xxxxxxxxxxxx.dkr.ecr.us-east-1.amazonaws.com
     """
-    match = re.match(r"^(\d{12})\.dkr\.ecr\.[a-z]{2}-[a-z]{4}-\d\.amazonaws\.com$", ecr_root)
+    match = re.match(r"^(\d{12})\.dkr\.ecr\.[a-z]{2}-[a-z]{4,9}-\d\.amazonaws\.com$", ecr_root)
     if match:
         return match.group(1)
     else:
@@ -129,7 +129,7 @@ def parse_ecr_url(ecr_url: str) -> Tuple[str, str, str]:
     E.g. https://xxxxxxxxxxxx.dkr.ecr.us-east-1.amazonaws.com/salesforce:7.2.0-latest
     """
     ecr_root, repo = parse_url(ecr_url)
-    if not re.match("^\d{12}\.dkr\.ecr\.[a-z]{2}-[a-z]{4}-\d\.amazonaws\.com$", ecr_root):
+    if not re.match("^\d{12}\.dkr\.ecr\.[a-z]{2}-[a-z]{4,9}-\d\.amazonaws\.com$", ecr_root):
         raise ValueError("malformed registry, correct pattern is https://aws_account_id.dkr.ecr.region.amazonaws.com")
     if not re.match("^[^:]+:[^:]+$", repo):
         raise ValueError("malformed image name, only one colon allowed to delimit image name and tag")
