@@ -15,7 +15,7 @@ Different Glue versions support different Python versions. The following table b
 |---|---|----------------------|
 | 2.0  | 3.7  | glue-2.0             |
 | 3.0  | 3.7  | glue-3.0             |
-| 4.0  | 3.10 | master               |
+| 4.0  | 3.10 | glue-4.0             |
 
 You may refer to AWS Glue's official [release notes](https://docs.aws.amazon.com/glue/latest/dg/release-notes.html) for more information
 
