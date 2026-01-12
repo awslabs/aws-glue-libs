@@ -16,6 +16,7 @@ Different Glue versions support different Python versions. The following table b
 | 2.0  | 3.7  | glue-2.0             |
 | 3.0  | 3.7  | glue-3.0             |
 | 4.0  | 3.10 | master               |
+| 5.0  | 3.11 | glue-5.0             |
 
 You may refer to AWS Glue's official [release notes](https://docs.aws.amazon.com/glue/latest/dg/release-notes.html) for more information
 
@@ -31,11 +32,13 @@ The `awsglue` library provides only the Python interface to the Glue Spark runti
    * Glue version 2.0: `https://aws-glue-etl-artifacts.s3.amazonaws.com/glue-2.0/spark-2.4.3-bin-hadoop2.8.tgz1`
    * Glue version 3.0: `https://aws-glue-etl-artifacts.s3.amazonaws.com/glue-3.0/spark-3.1.1-amzn-0-bin-3.2.1-amzn-3.tgz`
    * Glue version 4.0: `https://aws-glue-etl-artifacts.s3.amazonaws.com/glue-4.0/spark-3.3.0-amzn-1-bin-3.3.3-amzn-0.tgz` 
+   * Glue version 5.0: download the Apache Spark 3.5.4 distribution from `https://spark.apache.org`
 1. export the `SPARK_HOME` environmental variable to the extracted location of the above Spark distribution. For example:
     ```
     Glue version 2.0: export SPARK_HOME=/home/$USER/spark-2.4.3-bin-hadoop2.8
     Glue version 3.0: export SPARK_HOME=/home/$USER/spark-3.1.1-amzn-0-bin-3.2.1-amzn-3
     Glue version 4.0: export SPARK_HOME=/home/$USER/spark-3.3.0-amzn-1-bin-3.3.3-amzn-0
+    Glue version 5.0: export SPARK_HOME=/home/$USER/spark-3.5.4-bin-hadoop3
     ```
 1. now you can run the executables in the `bin` directory to start a Glue Shell or submit a Glue Spark application.
     ```
@@ -65,4 +68,3 @@ git fetch origin
 git branch -u origin/glue-0.9 glue-0.9
 git remote set-head origin -a
 ```
-
