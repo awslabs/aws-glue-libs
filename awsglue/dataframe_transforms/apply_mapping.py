@@ -10,7 +10,7 @@
 # or implied. See the License for the specific language governing
 # permissions and limitations under the License.
 
-from py4j.java_gateway import java_import
+from py4j.java_gateway import java_import # type: ignore
 from pyspark.sql.dataframe import DataFrame
 
 class ApplyMapping():

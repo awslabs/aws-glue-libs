@@ -21,7 +21,7 @@ from awsglue.dynamicframe import DynamicFrame
 from awsglue.transforms import get_transform
 from pyspark.sql.types import *
 from .scripts_utils import *
-from pyspark.sql.functions import *
+from pyspark.sql.functions import col
 
 def crawler_backup(glue_context, data, options):
     crawler_name = options['crawler.name']
