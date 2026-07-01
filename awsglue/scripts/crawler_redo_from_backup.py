@@ -20,7 +20,6 @@ from awsglue.dynamicframe import DynamicFrame
 from awsglue.transforms import get_transform
 from pyspark.sql.types import *
 from .scripts_utils import *
-from pyspark.sql.functions import *
 
 def crawler_redo_from_backup(glue_context, **options):
     spark_ctxt = glue_context._instantiatedContext

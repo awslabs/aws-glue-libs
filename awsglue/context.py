@@ -12,8 +12,7 @@
 
 from pyspark.sql import SQLContext
 from pyspark.sql import SparkSession
-from py4j.java_gateway import java_import
-from pyspark.sql.utils import StreamingQueryException
+from py4j.java_gateway import java_import # type: ignore
 
 from awsglue.data_source import DataSource
 from awsglue.streaming_data_source import StreamingDataSource
@@ -53,15 +52,23 @@ class GlueContext(SQLContext):
     Spark_SQL_Formats = {"parquet", "orc"}
     Unsupported_Compression_Types = {"lzo"}
 
-    def __init__(self, sparkContext, **options):
-        super(GlueContext, self).__init__(sparkContext)
+    def __init__(self, sparkContext=None, **options):
+        if not sparkContext:
+            spark_session = SparkSession.builder.getOrCreate()
+            sparkContext = spark_session.sparkContext
+        elif type(sparkContext) == SparkSession:
+            spark_session = sparkContext
+            sparkContext = spark_session.sparkContext
+        else:
+            spark_session = SparkSession.builder.getOrCreate()
+        super(GlueContext, self).__init__(sparkContext, spark_session)
         register(sparkContext)
         self._glue_scala_context = self._get_glue_scala_context(**options)
         self.create_dynamic_frame = DynamicFrameReader(self)
         self.create_data_frame = DataFrameReader(self)
         self.write_dynamic_frame = DynamicFrameWriter(self)
         self.write_data_frame = DataFrameWriter(self)
-        self.spark_session = SparkSession(sparkContext, self._glue_scala_context.getSparkSession())
+        self.spark_session = self.sparkSession
         self._glue_logger = sparkContext._jvm.GlueLogger()
 
     @property
