@@ -1,0 +1,16 @@
+[build-system]
+requires = ["setuptools>=68.0", "setuptools-scm>=8"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "AWSGlueDataplanePython"
+dynamic = ["version"]
+description = "AWS Glue Python library for local ETL script development"
+readme = "README.md"
+license = {file = "LICENSE.txt"}
+requires-python = ">=3.11,<3.12"
+
+[tool.setuptools_scm]
+
+[tool.setuptools.packages.find]
+include = ["awsglue*"]
