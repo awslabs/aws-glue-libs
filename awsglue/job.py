@@ -9,7 +9,7 @@
 # on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, express
 # or implied. See the License for the specific language governing
 # permissions and limitations under the License.
-
+from py4j.java_gateway import java_import # type: ignore
 class Job:
     @classmethod
     def continuation_options(cls):
@@ -33,13 +33,23 @@ class Job:
     @classmethod
     def data_lineage_options(cls):
         return [ '--enable-data-lineage']
-    
-    def __init__(self, glue_context):
-        self._job = glue_context._jvm.Job
-        self._glue_context = glue_context
+    def __init__(self, glue_context_or_spark_session):
+        from pyspark.sql import SparkSession
+        from awsglue.context import GlueContext
+        if isinstance(glue_context_or_spark_session, GlueContext):
+            self._job = glue_context_or_spark_session._jvm.Job
+            self._glue_context = glue_context_or_spark_session
+            self._spark_session = glue_context_or_spark_session.sparkSession
+        elif isinstance(glue_context_or_spark_session, SparkSession):
+            java_import(glue_context_or_spark_session._jvm, "com.amazonaws.services.glue.util.Job")
+            self._job = glue_context_or_spark_session._jvm.Job
+            self._glue_context = None
+            self._spark_session = glue_context_or_spark_session
+        else:
+            raise Exception("cannot init Job instance given input parameter type: " + str(type(glue_context_or_spark_session)))
 
     def init(self, job_name, args = {}):
-        self._job.init(job_name, self._glue_context._glue_scala_context, args)
+        self._job.init(job_name, self._spark_session._jsparkSession, args)
 
     def isInitialized(self):
         return self._job.isInitialized()
