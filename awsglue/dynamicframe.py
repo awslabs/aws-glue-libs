@@ -20,13 +20,10 @@ from pyspark.rdd import RDD, PipelinedRDD
 from pyspark.sql.dataframe import DataFrame
 from pyspark.serializers import PickleSerializer, BatchedSerializer
 
-if sys.version >= "3":
-    long = int
-    basestring = unicode = str
-    imap=map
-    ifilter=filter
-else:
-    from itertools import imap, ifilter
+long = int
+basestring = unicode = str
+imap = map
+ifilter = filter
 
 class ResolveOption(object):
     """
@@ -147,7 +144,7 @@ class DynamicFrame(object):
         return DataFrame(self._jdf.toDF(self.glue_ctx._jvm.PythonUtils.toSeq(scala_options)), self.glue_ctx)
 
     @classmethod
-    def fromDF(cls, dataframe, glue_ctx, name):
+    def fromDF(cls, dataframe, glue_ctx, name=""):
         """
         Convert a DataFrame to a DynamicFrame by converting DynamicRecords to Rows
         :param dataframe: A spark sql DataFrame
@@ -157,7 +154,6 @@ class DynamicFrame(object):
         """
         return DynamicFrame(glue_ctx._jvm.DynamicFrame.apply(dataframe._jdf, glue_ctx._ssql_ctx),
                             glue_ctx, name)
-
 
     def unbox(self, path, format, transformation_ctx="", info = "", stageThreshold = 0, totalThreshold = 0, **options):
         """
@@ -389,6 +385,10 @@ class DynamicFrame(object):
 
     def unnest_ddb_json(self, transformation_ctx="", info="", stageThreshold=0, totalThreshold=0):
         new_jdf = self._jdf.unnestDDBJson(transformation_ctx, _call_site(self._sc, callsite(), info), long(stageThreshold), long(totalThreshold))
+        return DynamicFrame(new_jdf, self.glue_ctx, self.name)
+
+    def simplify_ddb_json(self):
+        new_jdf = self._jdf.simplifyDDBJson()
         return DynamicFrame(new_jdf, self.glue_ctx, self.name)
 
     def resolveChoice(self, specs=None, choice="", database=None, table_name=None,

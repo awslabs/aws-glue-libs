@@ -139,6 +139,9 @@ class StringType(AtomicType):
 class TimestampType(AtomicType):
     pass
 
+class TimestampNTZType(AtomicType):
+    pass
+
 
 class UnknownType(AtomicType):
     pass
@@ -340,19 +343,19 @@ class EntityType(DataType):
 
 _atomic_types = [BinaryType, BooleanType, ByteType, DateType, DecimalType,
                  DoubleType, EnumType, FloatType, IntegerType, LongType, NullType,
-                 ShortType, StringType, TimestampType, UnknownType]
+                 ShortType, StringType, TimestampType, TimestampNTZType, UnknownType]
 
 
 _complex_types = [ArrayType, ChoiceType, MapType, StructType, SetType]
 
 
-_atomic_type_map = dict((t.typeName(), t) for t in _atomic_types)
+_atomic_type_map = dict((t.typeName(), t) for t in _atomic_types) # type: ignore
 
 
 _complex_type_map = dict((t.typeName(), t) for t in _complex_types)
 
 
-_all_type_map = dict((t.typeName(), t) for t in _atomic_types + _complex_types)
+_all_type_map = dict((t.typeName(), t) for t in _atomic_types + _complex_types) # type: ignore
 
 
 def _deserialize_json_string(json_str):
