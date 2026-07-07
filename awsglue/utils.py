@@ -77,7 +77,7 @@ class GlueArgumentParser(argparse.ArgumentParser):
 
 
 def getResolvedOptions(args, options):
-    parser = GlueArgumentParser()
+    parser = GlueArgumentParser(allow_abbrev=False)
 
     if Job.continuation_options()[0][2:] in options:
         raise RuntimeError("Using reserved arguments " + Job.continuation_options()[0][2:])
