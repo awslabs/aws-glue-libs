@@ -49,6 +49,11 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
 
+def escape_hocon_value(value):
+    """Escape a value for safe use in HOCON quoted strings."""
+    return value.replace('\\', '\\\\').replace('"', '\\"')
+
+
 def add_stream_handler() -> None:
     """
     Add a new stream handler to the logger at module level to emit LogRecord to std.out. With this setup, logs will show
@@ -160,6 +165,9 @@ def download_and_unpack_docker_layer(ecr_url: str, digest: str, dir_prefix: str,
     via the 'tar' command line tool because the tarfile library doesn't work for permission issue.
     """
     logger.info(f"Download/unpacking {digest} layer of image: {ecr_url}.")
+    # Validate digest format to prevent path traversal via crafted digest values
+    if not re.match(r'^[a-z0-9]+:[a-z0-9]+$', digest):
+        raise ValueError(f"Invalid layer digest format: {digest}")
     layer_id = digest.split(":")[1]
     logger.info(f"Preparing layer url and gz file path to store layer {layer_id}.")
     layer_gz_path = f"{dir_prefix}/{LAYER_GZ_DIR}/{layer_id}.gz"
@@ -177,7 +185,7 @@ def download_and_unpack_docker_layer(ecr_url: str, digest: str, dir_prefix: str,
             shutil.copyfileobj(f_in, f_out)
 
     logger.info(f"Unarchiving {layer_id} layer as tar file.")
-    run_commands(["tar", "-C", f"{dir_prefix}/{LAYER_TAR_DIR}/", "-xf", f"{dir_prefix}/{LAYER_TAR_DIR}/{layer_id}"])
+    run_commands(["tar", "--no-unsafe-links", "-C", f"{dir_prefix}/{LAYER_TAR_DIR}/", "-xf", f"{dir_prefix}/{LAYER_TAR_DIR}/{layer_id}"])
 
 
 def parse_args(args: List[str]) -> List[str]:
@@ -313,11 +321,15 @@ def download_jars_per_connection(conn: str, region: str, endpoint: str, proxy: O
     oem_key_path = f"{dir_prefix}/{LAYER_TAR_DIR}/oem/oem.txt"
     if path.exists(oem_key_path):
         with open(oem_key_path, 'r') as oem_file:
-            oem_key = oem_file.readline()
-            oem_value = oem_file.readline()
+            oem_key = oem_file.readline().strip()
+            oem_value = oem_file.readline().strip()
+        # Escape characters that could break HOCON quoted strings to prevent config injection.
+        oem_key = escape_hocon_value(oem_key)
+        oem_value = escape_hocon_value(oem_value)
         output = """marketplace_oem = {
         %s = {
-            oem_key = %s        oem_value = %s
+            oem_key = "%s"
+            oem_value = "%s"
           }
         }\n""" % (driver_name, oem_key, oem_value)
         with open("/tmp/glue-marketplace.conf", 'a') as opened_file:

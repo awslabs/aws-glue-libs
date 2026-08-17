@@ -15,7 +15,7 @@ from __future__ import print_function
 import sys
 import argparse
 from awsglue.context import GlueContext
-from pyspark.context import SparkContext
+from pyspark.core.context import SparkContext
 from awsglue.dynamicframe import DynamicFrame
 from awsglue.transforms import get_transform
 from pyspark.sql.types import *
