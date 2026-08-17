@@ -26,7 +26,7 @@ import shutil
 import string
 import subprocess
 import sys
-from typing import Any, Dict, List, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple, Union
 from urllib.parse import urlparse
 from os import path
 
@@ -43,6 +43,7 @@ CUSTOM = "CUSTOM"
 HTTP_PROXY = "HTTP_PROXY"
 HTTPS_PROXY = "HTTPS_PROXY"
 NO_PROXY = "NO_PROXY"
+ECR_HOST_PATTERN = r"^([0-9]{12})\.dkr\.ecr\.[a-z]{2}-[a-z]{4}-[0-9]\.amazonaws\.com$"
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -95,6 +96,7 @@ def extract_ecr_region(ecr_root: str) -> Union[None, str]:
     for region in session.get_available_regions("ecr"):
         if region in ecr_root:
             return region
+    return None
 
 
 def extract_registry_id(ecr_root: str) -> str:
@@ -102,7 +104,7 @@ def extract_registry_id(ecr_root: str) -> str:
     Extract AWS account id of the ECR registry from its root address
     e.g. xxxxxxxxxxxx.dkr.ecr.us-east-1.amazonaws.com
     """
-    match = re.match(r"^(\d{12})\.dkr\.ecr\.[a-z]{2}-[a-z]{4}-\d\.amazonaws\.com$", ecr_root)
+    match = re.match(ECR_HOST_PATTERN, ecr_root)
     if match:
         return match.group(1)
     else:
@@ -129,7 +131,7 @@ def parse_ecr_url(ecr_url: str) -> Tuple[str, str, str]:
     E.g. https://xxxxxxxxxxxx.dkr.ecr.us-east-1.amazonaws.com/salesforce:7.2.0-latest
     """
     ecr_root, repo = parse_url(ecr_url)
-    if not re.match("^\d{12}\.dkr\.ecr\.[a-z]{2}-[a-z]{4}-\d\.amazonaws\.com$", ecr_root):
+    if not re.match(ECR_HOST_PATTERN, ecr_root):
         raise ValueError("malformed registry, correct pattern is https://aws_account_id.dkr.ecr.region.amazonaws.com")
     if not re.match("^[^:]+:[^:]+$", repo):
         raise ValueError("malformed image name, only one colon allowed to delimit image name and tag")
@@ -208,13 +210,13 @@ def id_generator(size: int = 5, chars: str = string.ascii_uppercase + string.dig
     return ''.join(random.choice(chars) for _ in range(size))
 
 
-def get_connection(region: str, endpoint: str, conn: str, proxy: str = None) -> Union[Dict, None]:
+def get_connection(region: str, endpoint: str, conn: str, proxy: Optional[str] = None) -> Union[Dict, None]:
     """
     Get catalog connection metadata by calling Boto3 get_connection API, supports custom supplied region and endpoint.
     """
     config = Config()
     if proxy:
-        config.proxies = {'https': proxy}
+        config.proxies = {'https': proxy} # type: ignore
     glue = boto3.Session().client(
         service_name="glue",
         region_name=region,
@@ -267,7 +269,7 @@ def download_custom_jars(conn: Dict[str, Any], dest_folder: str = "/tmp/custom_c
     return res
 
 
-def download_jars_per_connection(conn: str, region: str, endpoint: str, proxy: str = None) -> List[str]:
+def download_jars_per_connection(conn: str, region: str, endpoint: str, proxy: Optional[str] = None) -> List[str]:
     # validate connection type
     connection = get_connection(region, endpoint, conn, proxy)
     if connection is None:

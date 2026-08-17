@@ -12,6 +12,7 @@
 
 from awsglue.dynamicframe import DynamicFrame
 from awsglue.utils import makeOptions, callsite
+from pyspark.sql import DataFrame
 
 class DataSource(object):
     def __init__(self, j_source, sql_ctx, name):
@@ -42,3 +43,7 @@ class DataSource(object):
     def getSampleFrame(self, num, **options):
         jframe = self._jsource.getSampleDynamicFrame(num, makeOptions(self._sql_ctx._sc, options))
         return DynamicFrame(jframe, self._sql_ctx, self.name)
+
+    def getDataFrame(self):
+        jdf = self._jsource.getDataFrame()
+        return DataFrame(jdf, self._sql_ctx)
