@@ -17,7 +17,8 @@ Different Glue versions support different Python versions. The following table b
 | 3.0  | 3.7  | glue-3.0             |
 | 4.0  | 3.10 | glue-4.0             |
 | 5.0  | 3.11 | glue-5.0             |
-| 5.1  | 3.11 | main                 |
+| 5.1  | 3.11 | glue-5.1             |
+| 6.0  | 3.13 | main                 |
 
 You may refer to AWS Glue's official [release notes](https://docs.aws.amazon.com/glue/latest/dg/release-notes.html) for more information
 
@@ -35,6 +36,7 @@ The `awsglue` library provides only the Python interface to the Glue Spark runti
    * Glue version 4.0: `https://aws-glue-etl-artifacts.s3.amazonaws.com/glue-4.0/spark-3.3.0-amzn-1-bin-3.3.3-amzn-0.tgz` 
    * Glue version 5.0: download the Apache Spark 3.5.4 distribution from `https://spark.apache.org`
    * Glue version 5.1: download the Apache Spark 3.5.6 distribution from `https://spark.apache.org`
+   * Glue version 6.0: download the Apache Spark 4.1.1 distribution from `https://spark.apache.org`
 1. export the `SPARK_HOME` environmental variable to the extracted location of the above Spark distribution. For example:
     ```
     Glue version 2.0: export SPARK_HOME=/home/$USER/spark-2.4.3-bin-hadoop2.8
@@ -42,6 +44,7 @@ The `awsglue` library provides only the Python interface to the Glue Spark runti
     Glue version 4.0: export SPARK_HOME=/home/$USER/spark-3.3.0-amzn-1-bin-3.3.3-amzn-0
     Glue version 5.0: export SPARK_HOME=/home/$USER/spark-3.5.4-bin-hadoop3
     Glue version 5.1: export SPARK_HOME=/home/$USER/spark-3.5.6-bin-hadoop3
+    Glue version 6.0: export SPARK_HOME=/home/$USER/spark-4.1.1-bin-hadoop3
     ```
 1. now you can run the executables in the `bin` directory to start a Glue Shell or submit a Glue Spark application.
     ```
@@ -58,6 +61,26 @@ The libraries in this repository licensed under the [Amazon Software License](ht
 ---
 
 # Release Notes
+
+## August 18 2026
+
+The `main` branch now represents Glue 6.0, which runs Apache Spark 4.1 on Python 3.13. Glue 5.1 has moved to the `glue-5.1` branch.
+
+### Breaking change: `getResolvedOptions` no longer accepts abbreviated argument names
+
+`getResolvedOptions` parses the arguments your job was invoked with. Previously an abbreviated argument name was accepted as long as it was an unambiguous prefix of a declared option, so passing `--additional-p` would resolve to `--additional-python-modules`. As of Glue 6.0 abbreviations are rejected and raise `GlueArgumentError`.
+
+Use the full option name in your job arguments:
+
+```python
+args = getResolvedOptions(sys.argv, ['JOB_NAME', 'additional-python-modules'])
+```
+
+If you depend on abbreviated names, opt back in explicitly:
+
+```python
+args = getResolvedOptions(sys.argv, ['JOB_NAME', 'additional-python-modules'], allow_abbrev=True)
+```
 
 ## July 26 2023
 * According to [AWS Glue version support policy](https://docs.aws.amazon.com/glue/latest/dg/glue-version-support-policy.html), branches for Glue 0.9 and 1.0 are removed as they are already deprecated.

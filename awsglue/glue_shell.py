@@ -13,7 +13,7 @@
 from __future__ import print_function
 import platform
 import pyspark
-from pyspark.context import SparkContext
+from pyspark.core.context import SparkContext
 from pyspark.sql import SQLContext
 from awsglue.context import GlueContext
 
@@ -22,10 +22,10 @@ sc = SparkContext()
 # TODO: Figure out if/how to use HiveContext
 glueContext = GlueContext(sc)
 
-welcome_msg = """Welcome to
+welcome_msg = r"""Welcome to
     ___ _       _______    ________
    /   | |     / / ___/   / ____/ /_  _____
-  / /| | | /| / /\\__ \\   / / __/ / / / / _ \\
+  / /| | | /| / /\__ \   / / __/ / / / / _ \
  / ___ | |/ |/ /___/ /  / /_/ / / /_/ /  __/
 /_/  |_|__/|__//____/   \____/_/\____/\___/
 """

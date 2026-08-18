@@ -11,7 +11,8 @@
 # permissions and limitations under the License.
 
 from pyspark import SparkContext
-from pyspark.sql.column import Column, _to_java_column, _to_seq
+from pyspark.sql.column import Column
+from pyspark.sql.classic.column import _to_java_column, _to_seq
 
 def replaceArrayElement(srcCol, replaceCol, idx):
     sc = SparkContext._active_spark_context
