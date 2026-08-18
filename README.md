@@ -62,6 +62,26 @@ The libraries in this repository licensed under the [Amazon Software License](ht
 
 # Release Notes
 
+## August 18 2026
+
+The `main` branch now represents Glue 6.0, which runs Apache Spark 4.1 on Python 3.13. Glue 5.1 has moved to the `glue-5.1` branch.
+
+### Breaking change: `getResolvedOptions` no longer accepts abbreviated argument names
+
+`getResolvedOptions` parses the arguments your job was invoked with. Previously an abbreviated argument name was accepted as long as it was an unambiguous prefix of a declared option, so passing `--additional-p` would resolve to `--additional-python-modules`. As of Glue 6.0 abbreviations are rejected and raise `GlueArgumentError`.
+
+Use the full option name in your job arguments:
+
+```python
+args = getResolvedOptions(sys.argv, ['JOB_NAME', 'additional-python-modules'])
+```
+
+If you depend on abbreviated names, opt back in explicitly:
+
+```python
+args = getResolvedOptions(sys.argv, ['JOB_NAME', 'additional-python-modules'], allow_abbrev=True)
+```
+
 ## July 26 2023
 * According to [AWS Glue version support policy](https://docs.aws.amazon.com/glue/latest/dg/glue-version-support-policy.html), branches for Glue 0.9 and 1.0 are removed as they are already deprecated.
 
