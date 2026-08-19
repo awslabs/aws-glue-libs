@@ -51,6 +51,7 @@ def callsite():
 
 # Definitions for Python 2/Python 3
 if sys.version >= "3":
+    basestring = unicode = str
     def iteritems(d, **kwargs):
         return iter(d.items(**kwargs))
     def iterkeys(d, **kwargs):
