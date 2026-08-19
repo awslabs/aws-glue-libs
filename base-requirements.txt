@@ -53,7 +53,7 @@ requests==2.33.1
 s3fs==2026.3.0
 s3transfer==0.16.0
 seaborn==0.13.2
-setuptools==79.0.1
+setuptools==83.0.0
 simplejson==3.20.2
 six==1.17.0
 tenacity==9.1.2
