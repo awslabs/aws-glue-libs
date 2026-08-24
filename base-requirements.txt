@@ -33,7 +33,7 @@ numpy==2.4.4
 orjson==3.11.8
 packaging==26.0
 pandas==2.3.3
-pillow==12.2.0
+pillow==12.3.0
 pip==24.0
 platformdirs==4.9.6
 plotly==6.7.0
