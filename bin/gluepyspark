@@ -2,4 +2,12 @@
 
 ROOT_DIR="$(cd $(dirname "$0")/..; pwd)"
 source $ROOT_DIR/bin/glue-setup.sh
+
+for arg in "$@"; do
+  if [[ $arg == *.py ]]; then
+	echo "Use ./bin/gluesparksubmit <Python script path> if you want to run a script through glue. This script, i.e., gluepyspark, is used to launch an interactive session."
+	exit 1
+  fi
+done
+
 exec "${SPARK_HOME}/bin/pyspark" "$@"
