@@ -16,7 +16,7 @@ import sys
 from awsglue.utils import makeOptions, callsite
 from awsglue.gluetypes import _deserialize_json_string, _create_dynamic_record, _revert_to_dict, _serialize_schema
 from awsglue.utils import _call_site, _as_java_list, _as_scala_option, _as_resolve_choiceOption, iteritems, itervalues
-from pyspark.rdd import RDD, PipelinedRDD
+from pyspark.core.rdd import RDD, PipelinedRDD
 from pyspark.sql.dataframe import DataFrame
 from pyspark.serializers import PickleSerializer, BatchedSerializer
 
