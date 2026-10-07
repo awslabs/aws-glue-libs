@@ -61,7 +61,7 @@ typing_extensions==4.15.0
 tzdata==2026.1
 urllib3==2.6.3
 uv==0.11.6
-virtualenv==21.2.1
+virtualenv==21.7.13
 wrapt==2.1.2
 yarl==1.23.0
 zstandard==0.25.0
