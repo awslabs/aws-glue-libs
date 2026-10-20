@@ -27,7 +27,7 @@ kaleido==1.2.0
 kiwisolver==1.5.0
 logistro==2.0.1
 matplotlib==3.10.8
-multidict==6.7.1
+multidict==6.9.1
 narwhals==2.19.0
 numpy==2.4.4
 orjson==3.11.8
