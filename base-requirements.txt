@@ -60,7 +60,7 @@ tenacity==9.1.2
 typing_extensions==4.15.0
 tzdata==2026.1
 urllib3==2.6.3
-uv==0.11.6
+uv==0.13.4
 virtualenv==21.2.1
 wrapt==2.1.2
 yarl==1.23.0
